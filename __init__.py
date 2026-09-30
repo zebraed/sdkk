@@ -1,7 +1,5 @@
 """
 Driven key creation, management, and import/export tool for Maya.
-
-ドリブンキー作成・管理・インポート・エクスポート用ツール
 """
 __author__ = "zebraed"
 __copyright__ = "Copyright 2019-2026, zebraed"
@@ -46,6 +44,7 @@ if TYPE_CHECKING:
         mirror_driven_keys,
         remove_key,
         rename_driven_keys,
+        retarget_driven_keys,
         set_driven_key,
         set_driven_keys,
     )
@@ -59,6 +58,7 @@ _EXPORTS = {
     "rename_driven_keys": "ops",
     "copy_driven_keys": "ops",
     "mirror_driven_keys": "ops",
+    "retarget_driven_keys": "ops",
     "export_driven_keys": "ops",
     "import_driven_keys": "ops",
     "apply_plan": "ops",

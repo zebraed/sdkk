@@ -361,6 +361,64 @@ def mirror_driven_keys(nodes, rule, side=Side.DRIVEN, policy=ConflictPolicy.REPL
     return _log_apply_result("Mirrored driven keys", _transfer(pairs, policy, unlock))
 
 
+@undo_chunk
+def retarget_driven_keys(driver, drivens, targets, policy=ConflictPolicy.REPLACE, unlock=False):
+    """Copy one driver attribute's driven keys onto other driver and driven nodes, matched by list order.
+
+    ドライバーアトリビュート1つのドリブンキーを、並び順で対応づけた別のドライバーとドリブンへコピーする
+
+    The driven nodes of drivens and of each row in targets are matched by their order in the list (the
+    first with the first, the second with the second, and so on). The attribute names and the key values
+    are kept. Only the driven keys of driver on the nodes in drivens are copied; keys
+    from other drivers, or on other nodes, are left out.
+
+    drivensと、targetsの各行のドリブンは、並び順で対応づける（1番目どうし、2番目どうし、…）
+    アトリビュート名とキーの値はそのまま
+    driverのドリブンキーのうち、drivensのノード上にあるものだけをコピーし、
+    ほかのドライバーのキーや、ほかのノード上のキーは対象外にする
+
+    Args:
+        driver (str): 元のドライバーアトリビュート（"arm_ctl.bend"など）
+        drivens (Sequence[str]): 元のドリブンのノード。この並びが、targetsの各行のドリブンとの対応になる
+        targets (Iterable[tuple[str, Sequence[str]]]): （先のドライバーのノード, 先のドリブンのノードの並び）の行
+            ドリブンの数はdrivensと同じにする。ノード名にアトリビュートを含めない
+        policy (ConflictPolicy): 先に同じ組がすでにある場合の扱い
+        unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
+
+    Returns:
+        ApplyResult: 結果
+
+    Raises:
+        ValueError: driverが存在しない場合、ドリブンのノードが存在しない、または曖昧な場合、
+            drivensに同じノードが複数ある場合、行のドリブンの数がdrivensと合わない場合、
+            ノード名にアトリビュートを含む場合、2つのドリブンキーが同じ組へ移る場合
+            シーンを変更する前に送出する
+
+    Examples:
+        >>> import sdkk
+        >>> # 腕のbendが動かす3つのジョイントのドリブンキーを、脚のbendとジョイントへコピーする
+        >>> result = sdkk.retarget_driven_keys(
+        ...     "arm_ctl.bend",
+        ...     ["shoulder_jnt", "elbow_jnt", "wrist_jnt"],
+        ...     [("leg_ctl", ["hip_jnt", "knee_jnt", "ankle_jnt"])],
+        ... )
+        >>> result.created
+        ('leg_ctl_bend_to_hip_jnt_rotateZ_animCurveUA', 'leg_ctl_bend_to_knee_jnt_rotateZ_animCurveUA', ...)
+        >>> # 複数の行は、スクリプトで組み立てて一度に載せられる
+        >>> rows = [(f"leg{s}_ctl", [f"hip{s}_jnt", f"knee{s}_jnt", f"ankle{s}_jnt"]) for s in ("L", "R")]
+        >>> result = sdkk.retarget_driven_keys("arm_ctl.bend", ["shoulder_jnt", "elbow_jnt", "wrist_jnt"], rows)
+    """
+    if not cmds.objExists(driver):
+        raise ValueError(f"Driver attribute not found: {driver}")
+
+    drivens = list(drivens)
+    pairs = drivenkey.build_retarget_pairs(_read_driven_keys([driver], Side.DRIVER), drivens, targets)
+    if not pairs:
+        logger.warning("No driven keys of %s found on: %s", driver, ", ".join(drivens))
+
+    return _log_apply_result("Retargeted driven keys", _transfer(pairs, policy, unlock))
+
+
 def check_mirrored_driven_keys(nodes, rule, side=Side.DRIVEN):
     """Check that each driven key has a mirrored counterpart that matches its mirrored result.
 

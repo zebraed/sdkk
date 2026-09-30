@@ -268,14 +268,6 @@ class CurveData:
         ドライバー値が時間とともに減少する場合は、キーの並び、各キーの入りと出の接線、
         preとpostのinfinityを入れ替える
 
-        The tangent vectors are carried over as they are, because the x axis
-        changes from time to driver value and there is no unit-independent
-        way to rescale them here. Maya recomputes them for every tangent
-        type except "fixed".
-
-        接線のベクトルはそのまま引き継ぐ。x軸が時間からドライバー値へ変わるが、
-        ここでは単位に依存せず伸縮する方法がないため
-        "fixed"以外の接線タイプではMayaが計算し直す
 
         Args:
             driver_values (Sequence[float]): キーごとのドライバー値。self.keysと同じ順・同じ数
@@ -380,7 +372,7 @@ class MirrorRule:
 class DrivenKeyData:
     """One driven key (a single animCurve and its connections).
 
-    ドリブンキー1つ分（animCurve 1つとその接続先）
+    ドリブンキーのデータ（animCurveとその接続先）
 
     Attributes:
         driver (Plug): ドライバーアトリビュート
@@ -414,6 +406,35 @@ class DrivenKeyData:
             bool: ドライバーとドリブンがどちらも同じ場合はTrue
         """
         return self.driver == other.driver and self.driven == other.driven
+
+    def retargeted(self, driver, driven):
+        """Return data moved onto another driver node and driven node, keeping the attributes and keys.
+
+        別のドライバーのノードとドリブンのノードへ移したデータを返す
+        アトリビュート名とキーはそのままにする
+
+        The curve name is left to the naming rule. A blendWeighted whose name follows the naming rule is
+        renamed for the new driven, and one with a custom name keeps its name.
+
+        カーブ名は命名規則に任せる
+        blendWeightedは、命名規則どおりの名前ならドリブンに合わせて付け直し、独自の名前ならそのままにする
+
+        Args:
+            driver (str): 移し先のドライバーのノード名
+            driven (str): 移し先のドリブンのノード名
+
+        Returns:
+            DrivenKeyData: 移した結果
+        """
+        target_driven = Plug(driven, self.driven.attr)
+        rule_name = build_blend_name(self.driven)
+        blend = tuple(
+            replace(level, name=build_blend_name(target_driven))
+            if strip_path_and_namespace(level.name) == rule_name
+            else level
+            for level in self.blend
+        )
+        return replace(self, driver=Plug(driver, self.driver.attr), driven=target_driven, name=None, blend=blend)
 
     def renamed(self, node_mapper, attr_mapper=None):
         """Return data with the node names replaced.
@@ -711,7 +732,8 @@ def _convert_to_float_list(value):
 
 
 def _resolve_driver_direction(driver_values, key_positions):
-    """Decide whether the driver values increase or decrease, and reject values that cannot be a curve.
+    """Decide whether the driver values increase or decrease,
+    and reject values that cannot be a curve.
 
     ドライバー値が増加か減少かを判定し、カーブにできない並びを弾く
 
@@ -754,7 +776,6 @@ def _scale_tangent(tangent, x_scale, y_scale):
 
 
 def _is_same_value(left, right, tolerance):
-    # boolはintのサブクラスなので、数値として許容誤差で比べない
     numbers_only = all(isinstance(value, numbers.Real) and not isinstance(value, bool) for value in (left, right))
     if numbers_only:
         return math.isclose(left, right, abs_tol=tolerance)

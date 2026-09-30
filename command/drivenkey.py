@@ -507,8 +507,95 @@ def check_mirrored_driven_keys(sources, rule):
     return items
 
 
+def resolve_node(name):
+    """Resolve a node name to its unique long name.
+
+    ノード名を、一意に決まるロングネームへ解決する
+
+    Args:
+        name (str): ノード名
+
+    Returns:
+        str: ロングネーム
+
+    Raises:
+        ValueError: ノードが存在しない場合、同じ名前のノードが複数ある場合
+    """
+    matches = cmds.ls(name, l=True)
+    if not matches:
+        raise ValueError(f"Node not found: {name}")
+
+    if len(matches) > 1:
+        raise ValueError(f"Multiple nodes match: {name}")
+
+    return matches[0]
+
+
+def build_retarget_pairs(sources, drivens, rows):
+    """Build the (source, target) pairs that move driven keys onto other driver and driven nodes.
+
+    ドリブンキーを別のドライバーとドリブンへ移す、（元, 先）の組を作る
+
+    The driven nodes of drivens and of each row are matched by their order in the list (the first with the
+    first, the second with the second, and so on). Sources on a driven node that is
+    not in drivens are left out, so only the driven keys on those nodes are moved.
+
+    drivensと各行のドリブンのノードは、並び順で対応づける（1番目どうし、2番目どうし、…）
+    drivensにないドリブンのノード上にあるsourcesは対象外にするため、それらのノードのドリブンキーだけを移す
+
+    Args:
+        sources (Iterable[DrivenKeyData]): 元のドリブンキー。ドライバーは呼び出し側で絞っておく
+        drivens (Sequence[str]): 元のドリブンのノード。各行のドリブンと同じ並びにする
+        rows (Iterable[tuple[str, Sequence[str]]]): （先のドライバーのノード, 先のドリブンのノードの並び）
+            ノード名にアトリビュートを含めない。アトリビュート名は元と同じものを使う
+
+    Returns:
+        list[tuple[DrivenKeyData, DrivenKeyData]]: （元, 先）の組。元のドリブンキーの順に、行ごとに並べる
+
+    Raises:
+        ValueError: ドリブンのノードが存在しない、または曖昧な場合、drivensに同じノードが複数ある場合、
+            行のドリブンの数がdrivensと合わない場合、ノード名にアトリビュートを含む場合、
+            2つのドリブンキーが同じ組へ移る場合
+    """
+    source_nodes = [resolve_node(node) for node in drivens]
+    orders = {node: order for order, node in enumerate(source_nodes)}
+    if len(orders) != len(source_nodes):
+        raise ValueError(f"drivens has the same node more than once: {', '.join(drivens)}")
+
+    targets = []
+    for index, (target_driver, target_drivens) in enumerate(rows):
+        target_drivens = list(target_drivens)
+        if len(target_drivens) != len(source_nodes):
+            raise ValueError(
+                f"Row {index}: the number of driven nodes does not match: {len(target_drivens)} != {len(source_nodes)}"
+            )
+
+        for node in [target_driver] + target_drivens:
+            if "." in node:
+                raise ValueError(f"Row {index}: expected a node name, not an attribute: {node}")
+
+        targets.append((target_driver, target_drivens))
+
+    pairs = []
+    moved = set()
+    for source in sources:
+        order = orders.get(resolve_node(source.driven.node))
+        if order is None:
+            continue
+
+        for target_driver, target_drivens in targets:
+            target = source.retargeted(target_driver, target_drivens[order])
+            # 同じ組へ2つ移すと、後のキーが先のキーを上書きしてしまう
+            if (target.driver, target.driven) in moved:
+                raise ValueError(f"Two driven keys are moved onto the same pair: {target.driver} -> {target.driven}")
+
+            moved.add((target.driver, target.driven))
+            pairs.append((source, target))
+
+    return pairs
+
+
 def _list_curves(node, side):
-    # 起点にカーブそのものを渡された場合は、そのカーブを対象にする
     if "." not in node and cmds.nodeType(node) in CURVE_TYPES:
         return [node]
 
@@ -527,7 +614,6 @@ def _list_curves(node, side):
 
 
 def _collect_upstream_curves(node):
-    # blendWeightedは入れ子になりうるため、animCurveに行き着くまで入力側をたどる
     node_type = cmds.nodeType(node)
     if node_type in CURVE_TYPES:
         return [node]
@@ -570,7 +656,6 @@ def _resolve_route(curve):
             return None, Status.UNSUPPORTED
 
         hops.append((destination.node, int(match.group(1))))
-        # DGは循環できないが、想定外の構成で止まらなくならないよう段数に上限を設ける
         if len(hops) > 64:
             return None, Status.UNSUPPORTED
 
@@ -769,7 +854,6 @@ def _disconnect_input(plug):
 
 
 def _connect_weighted(source, node, weight):
-    # 途中の要素が削除されて歯抜けになっている場合があるため、最大インデックスの次を使う
     indices = cmds.getAttr(f"{node}.input", mi=True)
     index = 0 if indices is None else max(indices) + 1
     cmds.connectAttr(source, f"{node}.input[{index}]")
