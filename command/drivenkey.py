@@ -25,6 +25,8 @@ from .animcurve import read_curve, write_curve
 from ..core.state import (
     ApplyResult,
     ConflictPolicy,
+    MirrorCheckItem,
+    MirrorStatus,
     PlanItem,
     PlanStatus,
     Side,
@@ -457,6 +459,54 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
     )
 
 
+def check_mirrored_driven_keys(sources, rule):
+    """Check whether each driven key has a counterpart in the scene that matches its mirrored result.
+
+    各ドリブンキーに、ミラーした結果と一致するドリブンキーがミラー先にあるかを調べる
+    シーンは変更しない
+
+    Sources whose driver and driven both stay the same after the name replacement (a center node, or
+    the counterpart itself under a one-way rule) are left out. When both directions of a pair are in
+    sources, as with a SwapMapper, the pair is reported once, from the source found first. Only the
+    curve is compared; the blendWeighted weights are not.
+
+    名前を置き換えてもドライバーとドリブンの両方が変わらない項目（中央のノード、一方向の規則での
+    ミラー先自身など）は対象外にする
+    SwapMapperのように両方向の組がsourcesに含まれる場合は、先に見つかった側を元として1件にまとめる
+    比較するのはカーブだけで、blendWeightedのウェイトは比較しない
+
+    Args:
+        sources (Iterable[DrivenKeyData]): ミラー元のドリブンキー
+        rule (MirrorRule): ミラー規則
+
+    Returns:
+        list[MirrorCheckItem]: 確認結果。ミラー先が正しいものも含む
+    """
+    items = []
+    checked = set()
+    for source in sources:
+        if source.renamed(rule.node_mapper, rule.attr_mapper).has_same_plugs(source):
+            continue
+
+        try:
+            target = source.mirrored(rule)
+        except ValueError as exc:
+            items.append(MirrorCheckItem(source, None, MirrorStatus.UNMIRRORABLE, str(exc)))
+            continue
+
+        # 反転は元に戻せるので、逆向きの組は同じ結果になる
+        pair = frozenset(((source.driver, source.driven), (target.driver, target.driven)))
+        if pair in checked:
+            continue
+
+        checked.add(pair)
+        # 確認にロックは関係しないため、ロックされたドリブンも解除した扱いで調べる
+        plan = _plan_driven_key(target, ConflictPolicy.REPLACE, True)
+        items.append(MirrorCheckItem.from_plan(source, plan, _read_existing_data(plan)))
+
+    return items
+
+
 def _list_curves(node, side):
     # 起点にカーブそのものを渡された場合は、そのカーブを対象にする
     if "." not in node and cmds.nodeType(node) in CURVE_TYPES:
@@ -575,6 +625,17 @@ def _plan_driven_key(data, policy, unlock):
         return PlanItem(data, PlanStatus.SKIP, f"Driven key already exists: {existing.curve}", existing.curve)
 
     return PlanItem(data, PlanStatus.REPLACE, existing=existing.curve)
+
+
+def _read_existing_data(item):
+    if item.status is not PlanStatus.REPLACE:
+        return None
+
+    key = DrivenKey.from_curve(item.existing)
+    if key.status is not Status.OK:
+        return None
+
+    return key.read()
 
 
 def _apply_item(item, blend_nodes):

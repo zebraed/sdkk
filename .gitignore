@@ -218,15 +218,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-
-# Agent
-.agent/
 .cursor/
-AGENT.md
-AGENTS.md
-CLAUDE.md
-SKILLS.md
 
 # test
 test/
 tests/
+misc/

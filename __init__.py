@@ -5,9 +5,10 @@ Driven key creation, management, and import/export tool for Maya.
 """
 __author__ = "zebraed"
 __copyright__ = "Copyright 2019-2026, zebraed"
+__license__ = "MIT"
 __email__ = "contact@sarygamysh.com"
 __status__ = "Stable"
-__version__ = "1.1.0"
+__version__ = "2.0.0"
 
 import importlib
 from typing import TYPE_CHECKING
@@ -24,6 +25,8 @@ if TYPE_CHECKING:
     from .core.state import (  # noqa: F401
         ApplyResult,
         ConflictPolicy,
+        MirrorCheckItem,
+        MirrorStatus,
         PlanItem,
         PlanStatus,
         Side,
@@ -33,6 +36,7 @@ if TYPE_CHECKING:
     from .core.serialize import DocumentError, read_document  # noqa: F401
     from .ops import (  # noqa: F401
         apply_plan,
+        check_mirrored_driven_keys,
         cleanup_driven_keys,
         convert_animation_to_driven_keys,
         copy_driven_keys,
@@ -58,6 +62,7 @@ _EXPORTS = {
     "export_driven_keys": "ops",
     "import_driven_keys": "ops",
     "apply_plan": "ops",
+    "check_mirrored_driven_keys": "ops",
     "cleanup_driven_keys": "ops",
     "list_driven_keys": "command.drivenkey",
     "find_driven_key": "command.drivenkey",
@@ -71,7 +76,9 @@ _EXPORTS = {
     "ConflictPolicy": "core.state",
     "DocumentError": "core.serialize",
     "DrivenKey": "command.drivenkey",
+    "MirrorCheckItem": "core.state",
     "MirrorRule": "core.model",
+    "MirrorStatus": "core.state",
     "NamespaceMapper": "core.model",
     "PlanItem": "core.state",
     "PlanStatus": "core.state",

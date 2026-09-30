@@ -9,6 +9,7 @@ from maya import cmds
 
 from ..core.model import CurveData, Infinity, KeyData, Tangent
 
+
 _CURVE_ATTRIBUTES = (
     "useCurveColor",
     "curveColorR",
@@ -71,7 +72,7 @@ def write_curve(curve, data):
 
     CurveDataの内容をanimCurveノードへ書き込む
 
-    # MEMO:すべてのキーを置いてから接線を設定する。キーを置くたびに接線を設定すると、
+    # MEMO:すべてのキーを置いてからTangentを設定する。キーを置くたびに接線を設定すると、
     後から置いたキーで前のキーの自動接線が計算し直されるため
 
     Args:
@@ -185,16 +186,8 @@ def _read_curve(curve, x_flag):
         pre_infinity=_get_infinity(curve, "preInfinity"),
         post_infinity=_get_infinity(curve, "postInfinity"),
         weighted=bool(cmds.getAttr(f"{curve}.weightedTangents")),
-        attributes=_read_attributes(curve),
+        attributes={attr: cmds.getAttr(f"{curve}.{attr}") for attr in _CURVE_ATTRIBUTES},
     )
-
-
-def _read_attributes(curve):
-    names = _CURVE_ATTRIBUTES
-    if cmds.nodeType(curve) in ("animCurveTA", "animCurveUA"):
-        names += ("rotationInterpolation",)
-
-    return {name: cmds.getAttr(f"{curve}.{name}") for name in names}
 
 
 def _get_infinity(curve, attr):

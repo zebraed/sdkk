@@ -2,11 +2,6 @@
 Driven key user operations (the entry point for the GUI and scripts).
 
 ドリブンキーのユーザー操作
-
-The public functions here are also available directly from the package,
-such as sdkk.set_driven_key.
-
-ここの公開関数は、sdkk.set_driven_keyのようにパッケージ直下からも使える
 """
 import datetime
 import logging
@@ -16,7 +11,7 @@ from maya import cmds
 from .utils import undo_chunk
 from .command import animation, drivenkey
 from .command.drivenkey import find_driven_key, list_driven_keys, plan_driven_keys
-from .core.state import ConflictPolicy, PlanStatus, Side, Status
+from .core.state import ConflictPolicy, MirrorStatus, PlanStatus, Side, Status
 from .core.model import Document, resolve_key_pairs
 from .core.serialize import read_document, write_document
 
@@ -25,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 @undo_chunk
 def set_driven_key(
-    driver, driven, driver_value=None, driven_value=None, *, in_type=None, out_type=None, name=None, **curve_attrs
+    driver, driven, driver_value=None, driven_value=None,
+    *,
+    in_type=None, out_type=None, name=None, **curve_attrs
 ):
     """Set keys on a driver/driven pair.
 
@@ -295,6 +292,11 @@ def copy_driven_keys(nodes, node_mapper, side=Side.DRIVEN, policy=ConflictPolicy
 
     ドリブンキーを、名前を置き換えた先へコピーする
 
+    Items whose driver and driven both stay the same after the replacement are skipped, since the
+    destination would be the source itself.
+
+    置き換え後もドライバーとドリブンの両方が同じ項目は、コピー先がコピー元自身になるため対象外にする
+
     Args:
         nodes (Iterable[str]): コピー元を探す起点のノードまたはアトリビュート
         node_mapper (Callable[[str], str]): コピー元からコピー先へのノード名の置換関数
@@ -357,6 +359,33 @@ def mirror_driven_keys(nodes, rule, side=Side.DRIVEN, policy=ConflictPolicy.REPL
             raise ValueError(f"{source.name}: {exc}") from exc
 
     return _log_apply_result("Mirrored driven keys", _transfer(pairs, policy, unlock))
+
+
+def check_mirrored_driven_keys(nodes, rule, side=Side.DRIVEN):
+    """Check that each driven key has a mirrored counterpart that matches its mirrored result.
+
+    各ドリブンキーに、ミラーした結果と一致するドリブンキーがミラー先にあるかを確認する
+
+    Args:
+        nodes (Optional[Iterable[str]]): ミラー元を探す起点のノードまたはアトリビュート。Noneはシーン全体
+        rule (MirrorRule): 名前の置換と、軸を反転するアトリビュート
+        side (Side): nodesをドリブン側とドライバー側のどちらとして探すか
+
+    Returns:
+        list[MirrorCheckItem]: 確認結果。ミラー先が正しいものも含む
+
+    Examples:
+        >>> import sdkk
+        >>> rule = sdkk.MirrorRule(
+        ...     node_mapper=sdkk.ReplaceMapper("_L", "_R"),
+        ...     invert_driven_attrs=frozenset({"translateX"}),
+        ... )
+        >>> # シーン全体で、左側のドリブンキーがミラー済みかを確認する
+        >>> items = sdkk.check_mirrored_driven_keys(None, rule)
+        >>> [(str(item.target.driven), item.status.value) for item in items if item.status.is_problem]
+        [('lip_R_jnt.translateX', 'not_mirrored')]
+    """
+    return _log_mirror_check(drivenkey.check_mirrored_driven_keys(_read_driven_keys(nodes, side), rule))
 
 
 def export_driven_keys(path, nodes=None, side=Side.DRIVEN):
@@ -559,6 +588,25 @@ def _log_apply_result(label, result):
     return result
 
 
+def _log_mirror_check(items):
+    problems = [item for item in items if item.status.is_problem]
+    logger.info(
+        "Checked %d mirrored driven key(s): %d OK, %d with problems",
+        len(items),
+        len(items) - len(problems),
+        len(problems),
+    )
+    for item in problems:
+        level = logging.INFO if item.status is MirrorStatus.MISSING else logging.WARNING
+        text = f"{item.source.driver} -> {item.source.driven}"
+        if item.target is not None:
+            text += f" (mirror: {item.target.driver} -> {item.target.driven})"
+
+        logger.log(level, "Mirror check %s: %s: %s", item.status.value, text, item.message)
+
+    return items
+
+
 def _read_driven_keys(nodes, side):
     keys = list_driven_keys(nodes, side)
     unreadable = [key for key in keys if key.status is not Status.OK]
@@ -573,6 +621,6 @@ def _read_driven_keys(nodes, side):
 
 
 def _transfer(pairs, policy, unlock):
-    targets = [target for source, target in pairs if target.driven != source.driven]
+    targets = [target for source, target in pairs if not target.has_same_plugs(source)]
     items = plan_driven_keys(targets, policy, unlock)
     return drivenkey.apply_plan(items)

@@ -402,15 +402,23 @@ class DrivenKeyData:
     def __post_init__(self):
         object.__setattr__(self, "blend", tuple(self.blend))
 
+    def has_same_plugs(self, other):
+        """Return whether the driver and driven are the same as another driven key's.
+
+        ドライバーとドリブンが、別のドリブンキーと同じかを返す
+
+        Args:
+            other (DrivenKeyData): 比較対象
+
+        Returns:
+            bool: ドライバーとドリブンがどちらも同じ場合はTrue
+        """
+        return self.driver == other.driver and self.driven == other.driven
+
     def renamed(self, node_mapper, attr_mapper=None):
         """Return data with the node names replaced.
 
         ノード名を置き換えたデータを返す
-
-        Applies to the driver and driven as well as the animCurve and
-        blendWeighted names.
-
-        ドライバー、ドリブンに加えて、animCurveとblendWeightedの名前にも適用する
 
         Args:
             node_mapper (Callable[[str], str]): ノード名の置換関数
@@ -435,11 +443,6 @@ class DrivenKeyData:
 
         ミラー規則に従って名前を置き換え、必要な軸を反転したデータを返す
 
-        Which axes to invert is decided from the attribute names before
-        replacement.
-
-        反転の判定には置き換え前のアトリビュート名を使う
-
         Args:
             rule (MirrorRule): ミラー規則
 
@@ -459,7 +462,7 @@ class DrivenKeyData:
 class Document:
     """The contents of one export file.
 
-    エクスポートファイル1本分の内容
+    エクスポートファイルの内容
 
     Attributes:
         driven_keys (tuple[DrivenKeyData, ...]): ドリブンキー

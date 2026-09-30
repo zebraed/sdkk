@@ -1,7 +1,7 @@
 """
 Maya-free values for driven key commands: search side, status, apply policy, and results.
 
-ドリブンキーのコマンドが受け渡す、Mayaを使わない値。探索の向き、状態、適用方針、結果
+ドリブンキーのコマンドが受け渡す、Mayaを使わないData型定義
 """
 from dataclasses import dataclass
 from enum import Enum
@@ -67,8 +67,6 @@ class PlanStatus(Enum):
 class PlanItem:
     """One item of an apply plan.
 
-    適用計画の1項目
-
     Attributes:
         data (DrivenKeyData): 適用するデータ（名前置換後）
         status (PlanStatus): 状態
@@ -105,3 +103,81 @@ class ApplyResult:
             f"ApplyResult(created={len(self.created)}, skipped={len(self.skipped)}, "
             f"failed={len(self.failed)}, warnings={len(self.warnings)})"
         )
+
+
+class MirrorStatus(Enum):
+    """The state of one mirrored counterpart.
+
+    ミラー先のドリブンキーの状態
+    """
+
+    OK = "ok"
+    NOT_MIRRORED = "not_mirrored"  # ミラー先のノードはあるが、ドリブンキーがない
+    DIFFERENT = "different"  # ミラー先にドリブンキーはあるが、ミラーした結果と内容が違う
+    MISSING = "missing"  # ミラー先のドライバーまたはドリブンが存在しない
+    BLOCKED = "blocked"  # ミラー先の状態のため確認できない（曖昧な名前、型の不一致、読み取れないカーブなど）
+    UNMIRRORABLE = "unmirrorable"  # ミラー規則を適用できない（step系の接線のドライバー軸の反転など）
+
+    @property
+    def is_problem(self):
+        return self is not MirrorStatus.OK
+
+
+@dataclass(frozen=True)
+class MirrorCheckItem:
+    """The result of checking one mirrored counterpart.
+
+    ミラー先のドリブンキーの確認結果
+
+    Attributes:
+        source (DrivenKeyData): ミラー元のデータ
+        target (Optional[DrivenKeyData]): ミラーした結果の期待値。ミラー規則を適用できない場合はNone
+        status (MirrorStatus): 状態
+        message (str): 状態の補足
+        existing (Optional[str]): ミラー先にある既存のanimCurveノード名
+        differences (tuple[str, ...]): 期待値との差分。statusがDIFFERENTのときだけ入る
+    """
+
+    source: DrivenKeyData
+    target: Optional[DrivenKeyData]
+    status: MirrorStatus
+    message: str = ""
+    existing: Optional[str] = None
+    differences: tuple[str, ...] = ()
+
+    @classmethod
+    def from_plan(cls, source, item, existing_data):
+        """Build a check result from the plan for a mirrored result and the counterpart's existing data.
+
+        ミラーした結果への適用計画と、ミラー先にある既存のデータから確認結果を作る
+
+        Args:
+            source (DrivenKeyData): ミラー元のデータ
+            item (PlanItem): ミラーした結果に対するplan_driven_keysの計画
+                ConflictPolicy.REPLACEで作ったもの
+            existing_data (Optional[DrivenKeyData]): item.existingを読み取ったデータ
+                既存がない場合や読み取れない場合はNone
+
+        Returns:
+            MirrorCheckItem: 確認結果
+        """
+        target = item.data
+        if item.status is PlanStatus.CREATE:
+            return cls(source, target, MirrorStatus.NOT_MIRRORED, "No driven key on the mirrored side")
+
+        if item.status is PlanStatus.MISSING:
+            return cls(source, target, MirrorStatus.MISSING, item.message)
+
+        if item.status is not PlanStatus.REPLACE:
+            return cls(source, target, MirrorStatus.BLOCKED, item.message, item.existing)
+
+        if existing_data is None:
+            message = f"Cannot read the driven key on the mirrored side: {item.existing}"
+            return cls(source, target, MirrorStatus.BLOCKED, message, item.existing)
+
+        differences = tuple(target.curve.diff(existing_data.curve))
+        if differences:
+            message = f"{len(differences)} difference(s) from the mirrored result, first: {differences[0]}"
+            return cls(source, target, MirrorStatus.DIFFERENT, message, item.existing, differences)
+
+        return cls(source, target, MirrorStatus.OK, existing=item.existing)
