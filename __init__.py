@@ -42,18 +42,26 @@ if TYPE_CHECKING:
         export_driven_keys,
         import_driven_keys,
         mirror_driven_keys,
+        move_driven_keys,
+        remove_driven_keys_at,
         remove_key,
         rename_driven_keys,
         retarget_driven_keys,
         set_driven_key,
         set_driven_keys,
+        set_driver_value,
     )
+    from .ui import show  # noqa: F401
 
 _EXPORTS = {
     "set_driven_key": "ops",
     "set_driven_keys": "ops",
+    "set_driver_value": "ops",
+    "show": "ui",
     "convert_animation_to_driven_keys": "ops",
     "remove_key": "ops",
+    "move_driven_keys": "ops",
+    "remove_driven_keys_at": "ops",
     "delete_driven_keys": "ops",
     "rename_driven_keys": "ops",
     "copy_driven_keys": "ops",

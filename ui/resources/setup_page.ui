@@ -1,0 +1,1877 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ui version="4.0">
+ <class>SetupPage</class>
+ <widget class="QWidget" name="SetupPage">
+  <property name="minimumSize">
+   <size>
+    <width>0</width>
+    <height>0</height>
+   </size>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout_page">
+   <property name="leftMargin">
+    <number>6</number>
+   </property>
+   <property name="topMargin">
+    <number>6</number>
+   </property>
+   <property name="rightMargin">
+    <number>6</number>
+   </property>
+   <property name="bottomMargin">
+    <number>6</number>
+   </property>
+   <property name="spacing">
+    <number>6</number>
+   </property>
+   <item>
+    <widget class="QWidget" name="holder_driver">
+     <layout class="QVBoxLayout" name="verticalLayout_holder_driver">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>4</number>
+      </property>
+      <item>
+       <widget class="QFrame" name="widget_driver_body">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_driver">
+         <property name="leftMargin">
+          <number>8</number>
+         </property>
+         <property name="topMargin">
+          <number>6</number>
+         </property>
+         <property name="rightMargin">
+          <number>8</number>
+         </property>
+         <property name="bottomMargin">
+          <number>6</number>
+         </property>
+         <property name="spacing">
+          <number>6</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_driver_node">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_driver_node">
+             <property name="text">
+              <string>(not set)</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_driver_node">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_set_selected">
+             <property name="text">
+              <string>Set Selected</string>
+             </property>
+             <property name="toolTip">
+              <string>Use the selected node as the driver</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_driver_mode">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>16</number>
+           </property>
+           <item>
+            <spacer name="spacer_driver_mode_l">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radio_driver_transform">
+             <property name="text">
+              <string>Transform</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radio_driver_custom">
+             <property name="text">
+              <string>Custom</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_driver_mode_r">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QStackedWidget" name="stack_driver_attr">
+           <property name="currentIndex">
+            <number>0</number>
+           </property>
+           <widget class="QWidget" name="page_driver_transform">
+            <layout class="QGridLayout" name="grid_driver_transform" columnstretch="0,1,1,1" rowstretch="0,0,0,0,1">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_driver_corner">
+               <property name="text">
+                <string />
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLabel" name="label_driver_axis_x">
+               <property name="text">
+                <string>X</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QLabel" name="label_driver_axis_y">
+               <property name="text">
+                <string>Y</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="3">
+              <widget class="QLabel" name="label_driver_axis_z">
+               <property name="text">
+                <string>Z</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_driver_t">
+               <property name="text">
+                <string>T</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>28</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>28</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QFrame" name="cell_driver_tx">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_tx">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_tx_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_tx">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>TX</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_tx_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QFrame" name="cell_driver_ty">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_ty">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_ty_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_ty">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>TY</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_ty_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="1" column="3">
+              <widget class="QFrame" name="cell_driver_tz">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_tz">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_tz_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_tz">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>TZ</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_tz_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_driver_r">
+               <property name="text">
+                <string>R</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>28</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>28</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QFrame" name="cell_driver_rx">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_rx">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_rx_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_rx">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>RX</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_rx_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="QFrame" name="cell_driver_ry">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_ry">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_ry_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_ry">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>RY</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_ry_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="2" column="3">
+              <widget class="QFrame" name="cell_driver_rz">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_rz">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_rz_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_rz">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>RZ</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_rz_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_driver_s">
+               <property name="text">
+                <string>S</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>28</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>28</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QFrame" name="cell_driver_sx">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_sx">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_sx_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_sx">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>SX</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_sx_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="3" column="2">
+              <widget class="QFrame" name="cell_driver_sy">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_sy">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_sy_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_sy">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>SY</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_sy_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="3" column="3">
+              <widget class="QFrame" name="cell_driver_sz">
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <layout class="QHBoxLayout" name="horizontalLayout_cell_driver_sz">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item>
+                 <spacer name="spacer_cell_driver_sz_l">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QRadioButton" name="radio_driver_sz">
+                  <property name="text">
+                   <string />
+                  </property>
+                  <property name="toolTip">
+                   <string>SZ</string>
+                  </property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="spacer_cell_driver_sz_r">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="4" column="0" rowspan="1" colspan="4">
+              <spacer name="spacer_driver_grid">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>0</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="page_driver_custom">
+            <layout class="QVBoxLayout" name="verticalLayout_driver_custom">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <property name="spacing">
+              <number>3</number>
+             </property>
+             <item>
+              <widget class="QLabel" name="label_driver_attribute">
+               <property name="text">
+                <string>Attribute</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QWidget" name="holder_driver_picker">
+               <layout class="QHBoxLayout" name="horizontalLayout_driver_picker">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>4</number>
+                </property>
+               </layout>
+              </widget>
+             </item>
+             <item>
+              <spacer name="spacer_driver_custom">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>0</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <layout class="QGridLayout" name="grid_driver_info" columnstretch="0,1">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item row="0" column="0">
+            <widget class="QLabel" name="label_driver_attr_caption">
+             <property name="text">
+              <string>Attribute :</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
+            <widget class="QLabel" name="label_driver_attr">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label_driver_value_caption">
+             <property name="text">
+              <string>Value :</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="1">
+            <widget class="QLabel" name="label_driver_value">
+             <property name="text">
+              <string>-</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="holder_driven">
+     <layout class="QVBoxLayout" name="verticalLayout_holder_driven">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>4</number>
+      </property>
+      <item>
+       <widget class="QFrame" name="widget_driven_body">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_driven">
+         <property name="leftMargin">
+          <number>8</number>
+         </property>
+         <property name="topMargin">
+          <number>6</number>
+         </property>
+         <property name="rightMargin">
+          <number>8</number>
+         </property>
+         <property name="bottomMargin">
+          <number>6</number>
+         </property>
+         <property name="spacing">
+          <number>6</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_driven_head">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_driven_nodes">
+             <property name="text">
+              <string>Driven Nodes</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_driven_head">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_add">
+             <property name="text">
+              <string>+ Add</string>
+             </property>
+             <property name="toolTip">
+              <string>Add the selected nodes as driven</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QTableView" name="table_driven_nodes">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>90</height>
+            </size>
+           </property>
+           <property name="showGrid">
+            <bool>false</bool>
+           </property>
+           <property name="wordWrap">
+            <bool>false</bool>
+           </property>
+           <property name="editTriggers">
+            <enum>QAbstractItemView::NoEditTriggers</enum>
+           </property>
+           <property name="selectionMode">
+            <enum>QAbstractItemView::ExtendedSelection</enum>
+           </property>
+           <property name="selectionBehavior">
+            <enum>QAbstractItemView::SelectRows</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="Line" name="line_driven_1">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="label_driven_node">
+           <property name="text">
+            <string>(no node selected)</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_driven_mode">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>16</number>
+           </property>
+           <item>
+            <spacer name="spacer_driven_mode_l">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radio_driven_transform">
+             <property name="text">
+              <string>Transform [0]</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radio_driven_custom">
+             <property name="text">
+              <string>Custom [0]</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_driven_mode_r">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QStackedWidget" name="stack_driven_attr">
+           <property name="currentIndex">
+            <number>0</number>
+           </property>
+           <widget class="QWidget" name="page_driven_transform">
+            <layout class="QGridLayout" name="grid_driven_transform" columnstretch="0,1,1,1" rowstretch="0,0,0,0,1">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QLabel" name="label_driven_corner">
+               <property name="text">
+                <string />
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QLabel" name="label_driven_axis_x">
+               <property name="text">
+                <string>X</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <widget class="QLabel" name="label_driven_axis_y">
+               <property name="text">
+                <string>Y</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="0" column="3">
+              <widget class="QLabel" name="label_driven_axis_z">
+               <property name="text">
+                <string>Z</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignCenter</set>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0">
+              <widget class="QLabel" name="label_driven_t">
+               <property name="text">
+                <string>T</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>28</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>28</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="1">
+              <widget class="QToolButton" name="btn_driven_tx">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>TX</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="2">
+              <widget class="QToolButton" name="btn_driven_ty">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>TY</string>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="3">
+              <widget class="QToolButton" name="btn_driven_tz">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>TZ</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="0">
+              <widget class="QLabel" name="label_driven_r">
+               <property name="text">
+                <string>R</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>28</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>28</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="1">
+              <widget class="QToolButton" name="btn_driven_rx">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>RX</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="2">
+              <widget class="QToolButton" name="btn_driven_ry">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>RY</string>
+               </property>
+              </widget>
+             </item>
+             <item row="2" column="3">
+              <widget class="QToolButton" name="btn_driven_rz">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>RZ</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="0">
+              <widget class="QLabel" name="label_driven_s">
+               <property name="text">
+                <string>S</string>
+               </property>
+               <property name="alignment">
+                <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>28</width>
+                 <height>0</height>
+                </size>
+               </property>
+               <property name="maximumSize">
+                <size>
+                 <width>28</width>
+                 <height>16777215</height>
+                </size>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="1">
+              <widget class="QToolButton" name="btn_driven_sx">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>SX</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="2">
+              <widget class="QToolButton" name="btn_driven_sy">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>SY</string>
+               </property>
+              </widget>
+             </item>
+             <item row="3" column="3">
+              <widget class="QToolButton" name="btn_driven_sz">
+               <property name="checkable">
+                <bool>true</bool>
+               </property>
+               <property name="gridCell" stdset="0">
+                <bool>true</bool>
+               </property>
+               <property name="text">
+                <string>0.00</string>
+               </property>
+               <property name="minimumSize">
+                <size>
+                 <width>70</width>
+                 <height>24</height>
+                </size>
+               </property>
+               <property name="sizePolicy">
+                <sizepolicy hsizetype="Expanding" vsizetype="Fixed" />
+               </property>
+               <property name="toolButtonStyle">
+                <enum>Qt::ToolButtonTextOnly</enum>
+               </property>
+               <property name="toolTip">
+                <string>SZ</string>
+               </property>
+              </widget>
+             </item>
+             <item row="4" column="0" rowspan="1" colspan="4">
+              <spacer name="spacer_driven_grid">
+               <property name="orientation">
+                <enum>Qt::Vertical</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>0</width>
+                 <height>0</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="page_driven_custom">
+            <layout class="QVBoxLayout" name="verticalLayout_driven_custom">
+             <property name="leftMargin">
+              <number>0</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>0</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <property name="spacing">
+              <number>3</number>
+             </property>
+             <item>
+              <widget class="QListWidget" name="list_driven_custom">
+               <property name="minimumSize">
+                <size>
+                 <width>0</width>
+                 <height>70</height>
+                </size>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QWidget" name="holder_driven_picker">
+               <layout class="QHBoxLayout" name="horizontalLayout_driven_picker">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>4</number>
+                </property>
+               </layout>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </widget>
+         </item>
+         <item>
+          <widget class="Line" name="line_driven_2">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QWidget" name="holder_pose_strip">
+           <layout class="QVBoxLayout" name="verticalLayout_pose_strip">
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
+            </property>
+            <property name="rightMargin">
+             <number>0</number>
+            </property>
+            <property name="bottomMargin">
+             <number>0</number>
+            </property>
+            <property name="spacing">
+             <number>4</number>
+            </property>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_key_info">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_pose_driver">
+             <property name="text">
+              <string>Driver : -</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_key_info">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_key_status">
+             <property name="text">
+              <string>○ No Key</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_key">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <spacer name="spacer_key">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_key">
+             <property name="text">
+              <string>SET KEY</string>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>170</width>
+               <height>32</height>
+              </size>
+             </property>
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="spacer_page">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>0</width>
+       <height>0</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+</ui>

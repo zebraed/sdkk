@@ -1,7 +1,8 @@
 """
-Find, create, and delete driven key connections (driver -> animCurve -> blendWeighted chain -> driven).
+Find, create, and delete driven key connections (driver ->
+animCurve -> blendWeighted chain -> driven).
 
-ドリブンキーの接続（driver → animCurve → 多段のblendWeighted → driven）の探索・作成・削除
+ドリブンキーの接続（driver → animCurve → blendWeighted → driven）の探索・作成・削除
 """
 import abc
 import math
@@ -37,7 +38,7 @@ CURVE_TYPES = ("animCurveUA", "animCurveUL", "animCurveUU", "animCurveUT")
 
 
 class Route(abc.ABC):
-    """Abstract base class for the route from a curve's output to the driven attribute.
+    """Abstract base for the route from a curve's output to the driven.
 
     カーブの出力からドリブンアトリビュートまでの経路を表す抽象クラス
 
@@ -67,7 +68,9 @@ class Route(abc.ABC):
 
 
 class DirectRoute(Route):
-    """A route where the curve's output connects directly to the driven (unitConversion is transparent).
+    """A route where the curve's output connects directly to the driven.
+
+    unitConversion is transparent.
 
     カーブの出力がドリブンへ直接つながる経路（unitConversionは透過する）
     """
@@ -76,12 +79,11 @@ class DirectRoute(Route):
         return ()
 
     def detach(self):
-        # カーブを削除すれば接続も外れるため、後始末は不要
         pass
 
 
 class BlendRoute(Route):
-    """A route that goes through one or more chained blendWeighted nodes.
+    """A route through one or more chained blendWeighted nodes.
 
     1段以上のblendWeightedを経由する経路
 
@@ -96,7 +98,10 @@ class BlendRoute(Route):
         self.hops = hops
 
     def get_blend_data(self):
-        return tuple(BlendData(node, cmds.getAttr(f"{node}.weight[{index}]")) for node, index in self.hops)
+        return tuple(
+            BlendData(node, cmds.getAttr(f"{node}.weight[{index}]"))
+            for node, index in self.hops
+        )
 
     def detach(self):
         for node, index in self.hops:
@@ -111,16 +116,19 @@ class BlendRoute(Route):
                 cmds.removeMultiInstance(f"{node}.weight[{index}]", b=True)
 
             # 他の枝がまだ入力しているなら、ここから外側はその枝が使っているので残す
-            if cmds.listConnections(f"{node}.input", s=True, d=False) is not None:
+            if cmds.listConnections(
+                f"{node}.input", s=True, d=False,
+            ) is not None:
                 break
 
-            # 入力がなくなったblendWeightedは出力が0になるだけなので消す
             cmds.delete(node)
 
 
 @dataclass(frozen=True)
 class DrivenKey:
-    """One driven key in the scene (an animCurve node and its connections).
+    """One driven key in the scene.
+
+    An animCurve node and its connections.
 
     シーン上の1つのドリブンキー（animCurveノードとその接続）
 
@@ -138,7 +146,7 @@ class DrivenKey:
 
     @classmethod
     def from_curve(cls, curve):
-        """Build a DrivenKey by following the connections from an animCurve node.
+        """Build a DrivenKey by following an animCurve's connections.
 
         animCurveノードから接続をたどってDrivenKeyを作る
 
@@ -154,7 +162,9 @@ class DrivenKey:
         if cmds.nodeType(curve) not in CURVE_TYPES:
             raise ValueError(f"Not a driven key curve: {curve}")
 
-        drivers = cmds.listConnections(f"{curve}.input", s=True, d=False, p=True, scn=True)
+        drivers = cmds.listConnections(
+            f"{curve}.input", s=True, d=False, p=True, scn=True,
+        )
         driver = None if drivers is None else drivers[0]
         route, status = _resolve_route(curve)
         if status is Status.OK and driver is None:
@@ -164,7 +174,9 @@ class DrivenKey:
 
     @property
     def driven(self):
-        """Optional[str]: The driven attribute, or None if the route could not be resolved.
+        """Optional[str]: The driven attribute.
+
+        None if the route could not be resolved.
 
         ドリブンアトリビュート。経路を解決できなければNone
         """
@@ -182,7 +194,9 @@ class DrivenKey:
             ValueError: statusがOKでない場合
         """
         if self.status is not Status.OK:
-            raise ValueError(f"Cannot read driven key {self.curve}: {self.status.value}")
+            raise ValueError(
+                f"Cannot read driven key {self.curve}: {self.status.value}",
+            )
 
         return DrivenKeyData(
             driver=Plug.parse(self.driver),
@@ -194,7 +208,7 @@ class DrivenKey:
         )
 
     def delete(self):
-        """Delete the curve and any nodes on its route that become unnecessary.
+        """Delete the curve and unneeded nodes on its route.
 
         カーブと、経路上で不要になったノードを削除する
         """
@@ -251,7 +265,7 @@ def find_driven_key(driver, driven):
 
 
 def get_curve_type(plug):
-    """Return the animCurve node type a driven key on this attribute needs.
+    """Return the animCurve type this attribute's driven key needs.
 
     このアトリビュートのドリブンキーに必要なanimCurveのノード型を返す
 
@@ -272,15 +286,20 @@ def get_curve_type(plug):
 
 
 def set_key(
-    driver, driven, driver_value=None, driven_value=None, *, in_type=None, out_type=None, name=None, **curve_attrs
+    driver, driven, driver_value=None, driven_value=None,
+    *,
+    in_type=None, out_type=None, name=None, **curve_attrs
 ):
-    """Set keys with setDrivenKeyframe, then name the curve and set its attributes.
+    """Set keys, name the curve, and set its attributes.
+
+    Keys are set with setDrivenKeyframe.
 
     setDrivenKeyframeでキーを打ち、カーブの名前とアトリビュートを設定する
 
     Values can be a number or a sequence, one key per element. A newly
-    created curve is renamed per the naming rule unless name is given, and
-    a blendWeighted inserted by this call is renamed to "{driven}_{attr}_bw".
+    created curve is renamed per the naming rule unless name is
+    given, and a blendWeighted inserted by this call is renamed to
+    "{driven}_{attr}_bw".
 
     値は数値1つでも並びでもよく、要素ごとにキーを打つ。nameを指定しない場合、新しくできた
     カーブは命名規則でリネームする。このキーで挿入されたblendWeightedは"{driven}_{attr}_bw"にする
@@ -288,9 +307,11 @@ def set_key(
     Args:
         driver (str): ドライバーアトリビュート
         driven (str): ドリブンアトリビュート
-        driver_value (Optional[Union[float, Sequence[float]]]): キーを打つドライバー値
+        driver_value (Optional[Union[float, Sequence[float]]]):
+            キーを打つドライバー値
             Noneはドライバーの現在値
-        driven_value (Optional[Union[float, Sequence[float]]]): キーの値。driver_valueと同じ数にする
+        driven_value (Optional[Union[float, Sequence[float]]]):
+            キーの値。driver_valueと同じ数にする
             Noneはすべてのキーでドリブンの現在値
         in_type (Optional[str]): 入り側の接線タイプ。NoneはMayaの既定値
         out_type (Optional[str]): 出側の接線タイプ。NoneはMayaの既定値
@@ -311,12 +332,17 @@ def set_key(
     is_new = find_driven_key(driver, driven) is None
     input_before = _get_input_node(driven)
     for key_driver_value, key_driven_value in pairs:
-        flags = _build_key_flags(driver, key_driver_value, key_driven_value, in_type, out_type)
+        flags = _build_key_flags(
+            driver, key_driver_value, key_driven_value, in_type, out_type,
+        )
         cmds.setDrivenKeyframe(driven, **flags)
 
     key = find_driven_key(driver, driven)
     if key is None:
-        raise RuntimeError(f"Driven key curve was not found after keying: {driver} -> {driven}")
+        raise RuntimeError(
+            "Driven key curve was not found after keying: "
+            f"{driver} -> {driven}",
+        )
 
     if name is not None:
         key = rename_driven_key(key, name)
@@ -329,8 +355,10 @@ def set_key(
     return _rename_inserted_blend(key, driven, input_before)
 
 
-def remove_key(driver, driven, driver_value):
-    """Remove the key at the given driver value. Delete the whole driven key if it is the last one.
+def remove_key(driver, driven, driver_value, tolerance=1e-6):
+    """Remove the key at the given driver value.
+
+    Delete the whole driven key if it is the last one.
 
     指定したドライバー値のキーを消す。最後の1キーを消す場合はドリブンキーごと削除する
 
@@ -338,6 +366,7 @@ def remove_key(driver, driven, driver_value):
         driver (str): ドライバーアトリビュート
         driven (str): ドリブンアトリビュート
         driver_value (float): 消すキーのドライバー値
+        tolerance (float): 同じ値とみなす絶対誤差
 
     Returns:
         bool: 最後の1キーだったためドリブンキーごと削除した場合はTrue
@@ -353,9 +382,15 @@ def remove_key(driver, driven, driver_value):
     if values is None:
         raise ValueError(f"No keys on {key.curve}")
 
-    indices = [index for index, value in enumerate(values) if math.isclose(value, driver_value, abs_tol=1e-6)]
+    indices = [
+        index
+        for index, value in enumerate(values)
+        if math.isclose(value, driver_value, abs_tol=tolerance)
+    ]
     if not indices:
-        raise ValueError(f"No key at driver value {driver_value} on {key.curve}")
+        raise ValueError(
+            f"No key at driver value {driver_value} on {key.curve}",
+        )
 
     # 全キーを消すと空のカーブが残るため、最後の1キーはドリブンキーごと消す
     if len(values) == 1:
@@ -366,6 +401,58 @@ def remove_key(driver, driven, driver_value):
     return False
 
 
+def move_key(driver, driven, driver_value, new_value, tolerance=1e-6):
+    """Move the key at the given driver value to another driver value.
+
+    指定したドライバー値のキーを、別のドライバー値へ動かす
+
+    The driven value of the key is kept. A key cannot move onto or past
+    its neighbours.
+
+    キーのドリブン値は変えない。隣のキーと同じ位置や、その先へは動かせない
+
+    Args:
+        driver (str): ドライバーアトリビュート
+        driven (str): ドリブンアトリビュート
+        driver_value (float): 動かすキーのドライバー値
+        new_value (float): 動かし先のドライバー値
+        tolerance (float): 同じ値とみなす絶対誤差
+
+    Returns:
+        bool: 動かした場合はTrue。ドリブンキーまたはそのドライバー値のキーがなければFalse
+
+    Raises:
+        ValueError: 隣のキーと同じ位置、またはその先へ動かそうとした場合
+    """
+    key = find_driven_key(driver, driven)
+    if key is None:
+        return False
+
+    values = cmds.keyframe(key.curve, q=True, fc=True)
+    if values is None:
+        return False
+
+    indices = [
+        index
+        for index, value in enumerate(values)
+        if math.isclose(value, driver_value, abs_tol=tolerance)
+    ]
+    if not indices:
+        return False
+
+    index = indices[0]
+    crosses_previous = index > 0 and new_value <= values[index - 1]
+    crosses_next = index < len(values) - 1 and new_value >= values[index + 1]
+    if crosses_previous or crosses_next:
+        raise ValueError(
+            f"Cannot move the key at {driver_value} to {new_value} on "
+            f"{key.curve}: it would reach a neighbouring key",
+        )
+
+    cmds.keyframe(key.curve, index=(index, index), e=True, a=True, fc=new_value)
+    return True
+
+
 def rename_driven_key(key, name=None):
     """Rename a driven key's curve.
 
@@ -373,7 +460,8 @@ def rename_driven_key(key, name=None):
 
     Args:
         key (DrivenKey): 対象のドリブンキー。statusがOKであること
-        name (Optional[str]): 新しい名前。Noneは命名規則"{driver}_{attr}_to_{driven}_{attr}_{curve_type}"
+        name (Optional[str]): 新しい名前。Noneは命名規則
+            "{driver}_{attr}_to_{driven}_{attr}_{curve_type}"
 
     Returns:
         DrivenKey: リネーム後のドリブンキー。同名のノードがある場合、Mayaが番号を付ける
@@ -383,15 +471,22 @@ def rename_driven_key(key, name=None):
     """
     if name is None:
         if key.status is not Status.OK:
-            raise ValueError(f"Cannot build a name for driven key {key.curve}: {key.status.value}")
+            raise ValueError(
+                f"Cannot build a name for driven key {key.curve}: "
+                f"{key.status.value}",
+            )
 
-        name = build_curve_name(Plug.parse(key.driver), Plug.parse(key.driven), cmds.nodeType(key.curve))
+        name = build_curve_name(
+            Plug.parse(key.driver),
+            Plug.parse(key.driven),
+            cmds.nodeType(key.curve),
+        )
 
     return replace(key, curve=cmds.rename(key.curve, name))
 
 
 def plan_driven_keys(driven_keys, policy=ConflictPolicy.REPLACE, unlock=False):
-    """Check whether DrivenKeyData can be applied to the scene and build an apply plan.
+    """Check whether DrivenKeyData can be applied, and build a plan.
 
     DrivenKeyDataをシーンへ適用できるかを調べる。シーンは変更しない
 
@@ -412,8 +507,8 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
     シーンへ反映する
 
     A directly connected curve is built with setDrivenKeyframe. A curve
-    that goes through a blendWeighted chain is built explicitly, level by
-    level from the driven side, because setDrivenKeyframe only ever
+    that goes through a blendWeighted chain is built explicitly, level
+    by level from the driven side, because setDrivenKeyframe only ever
     creates a single level of blendWeighted. Items that share a level
     are connected to the same blendWeighted node.
 
@@ -460,15 +555,19 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
 
 
 def check_mirrored_driven_keys(sources, rule):
-    """Check whether each driven key has a counterpart in the scene that matches its mirrored result.
+    """Check that each driven key has a mirrored counterpart.
+
+    The counterpart in the scene must match the mirrored result.
 
     各ドリブンキーに、ミラーした結果と一致するドリブンキーがミラー先にあるかを調べる
     シーンは変更しない
 
-    Sources whose driver and driven both stay the same after the name replacement (a center node, or
-    the counterpart itself under a one-way rule) are left out. When both directions of a pair are in
-    sources, as with a SwapMapper, the pair is reported once, from the source found first. Only the
-    curve is compared; the blendWeighted weights are not.
+    Sources whose driver and driven both stay the same after the name
+    replacement (a center node, or the counterpart itself under a
+    one-way rule) are left out. When both directions of a pair are in
+    sources, as with a SwapMapper, the pair is reported once, from the
+    source found first. Only the curve is compared; the blendWeighted
+    weights are not.
 
     名前を置き換えてもドライバーとドリブンの両方が変わらない項目（中央のノード、一方向の規則での
     ミラー先自身など）は対象外にする
@@ -485,24 +584,33 @@ def check_mirrored_driven_keys(sources, rule):
     items = []
     checked = set()
     for source in sources:
-        if source.renamed(rule.node_mapper, rule.attr_mapper).has_same_plugs(source):
+        if source.renamed(
+            rule.node_mapper, rule.attr_mapper,
+        ).has_same_plugs(source):
             continue
 
         try:
             target = source.mirrored(rule)
         except ValueError as exc:
-            items.append(MirrorCheckItem(source, None, MirrorStatus.UNMIRRORABLE, str(exc)))
+            items.append(MirrorCheckItem(
+                source, None, MirrorStatus.UNMIRRORABLE, str(exc),
+            ))
             continue
 
         # 反転は元に戻せるので、逆向きの組は同じ結果になる
-        pair = frozenset(((source.driver, source.driven), (target.driver, target.driven)))
+        pair = frozenset((
+            (source.driver, source.driven),
+            (target.driver, target.driven),
+        ))
         if pair in checked:
             continue
 
         checked.add(pair)
         # 確認にロックは関係しないため、ロックされたドリブンも解除した扱いで調べる
         plan = _plan_driven_key(target, ConflictPolicy.REPLACE, True)
-        items.append(MirrorCheckItem.from_plan(source, plan, _read_existing_data(plan)))
+        items.append(MirrorCheckItem.from_plan(
+            source, plan, _read_existing_data(plan),
+        ))
 
     return items
 
@@ -532,13 +640,14 @@ def resolve_node(name):
 
 
 def build_retarget_pairs(sources, drivens, rows):
-    """Build the (source, target) pairs that move driven keys onto other driver and driven nodes.
+    """Build (source, target) pairs that move driven keys.
 
     ドリブンキーを別のドライバーとドリブンへ移す、（元, 先）の組を作る
 
-    The driven nodes of drivens and of each row are matched by their order in the list (the first with the
-    first, the second with the second, and so on). Sources on a driven node that is
-    not in drivens are left out, so only the driven keys on those nodes are moved.
+    The driven nodes of drivens and of each row are matched by their
+    order in the list (the first with the first, the second with the
+    second, and so on). Sources on a driven node that is not in drivens
+    are left out, so only the driven keys on those nodes are moved.
 
     drivensと各行のドリブンのノードは、並び順で対応づける（1番目どうし、2番目どうし、…）
     drivensにないドリブンのノード上にあるsourcesは対象外にするため、それらのノードのドリブンキーだけを移す
@@ -546,11 +655,13 @@ def build_retarget_pairs(sources, drivens, rows):
     Args:
         sources (Iterable[DrivenKeyData]): 元のドリブンキー。ドライバーは呼び出し側で絞っておく
         drivens (Sequence[str]): 元のドリブンのノード。各行のドリブンと同じ並びにする
-        rows (Iterable[tuple[str, Sequence[str]]]): （先のドライバーのノード, 先のドリブンのノードの並び）
+        rows (Iterable[tuple[str, Sequence[str]]]):
+            （先のドライバーのノード, 先のドリブンのノードの並び）
             ノード名にアトリビュートを含めない。アトリビュート名は元と同じものを使う
 
     Returns:
-        list[tuple[DrivenKeyData, DrivenKeyData]]: （元, 先）の組。元のドリブンキーの順に、行ごとに並べる
+        list[tuple[DrivenKeyData, DrivenKeyData]]:
+            （元, 先）の組。元のドリブンキーの順に、行ごとに並べる
 
     Raises:
         ValueError: ドリブンのノードが存在しない、または曖昧な場合、drivensに同じノードが複数ある場合、
@@ -560,19 +671,26 @@ def build_retarget_pairs(sources, drivens, rows):
     source_nodes = [resolve_node(node) for node in drivens]
     orders = {node: order for order, node in enumerate(source_nodes)}
     if len(orders) != len(source_nodes):
-        raise ValueError(f"drivens has the same node more than once: {', '.join(drivens)}")
+        raise ValueError(
+            "drivens has the same node more than once: "
+            f"{', '.join(drivens)}",
+        )
 
     targets = []
     for index, (target_driver, target_drivens) in enumerate(rows):
         target_drivens = list(target_drivens)
         if len(target_drivens) != len(source_nodes):
             raise ValueError(
-                f"Row {index}: the number of driven nodes does not match: {len(target_drivens)} != {len(source_nodes)}"
+                f"Row {index}: the number of driven nodes does not match: "
+                f"{len(target_drivens)} != {len(source_nodes)}"
             )
 
         for node in [target_driver] + target_drivens:
             if "." in node:
-                raise ValueError(f"Row {index}: expected a node name, not an attribute: {node}")
+                raise ValueError(
+                    f"Row {index}: expected a node name, not an attribute: "
+                    f"{node}",
+                )
 
         targets.append((target_driver, target_drivens))
 
@@ -587,7 +705,10 @@ def build_retarget_pairs(sources, drivens, rows):
             target = source.retargeted(target_driver, target_drivens[order])
             # 同じ組へ2つ移すと、後のキーが先のキーを上書きしてしまう
             if (target.driver, target.driven) in moved:
-                raise ValueError(f"Two driven keys are moved onto the same pair: {target.driver} -> {target.driven}")
+                raise ValueError(
+                    "Two driven keys are moved onto the same pair: "
+                    f"{target.driver} -> {target.driven}",
+                )
 
             moved.add((target.driver, target.driven))
             pairs.append((source, target))
@@ -600,7 +721,9 @@ def _list_curves(node, side):
         return [node]
 
     if side is Side.DRIVER:
-        return _filter_curves(cmds.listConnections(node, s=False, d=True, scn=True))
+        return _filter_curves(
+            cmds.listConnections(node, s=False, d=True, scn=True),
+        )
 
     sources = cmds.listConnections(node, s=True, d=False, scn=True)
     if sources is None:
@@ -640,7 +763,9 @@ def _filter_curves(nodes):
 
 
 def _resolve_route(curve):
-    destinations = cmds.listConnections(f"{curve}.output", s=False, d=True, p=True, scn=True)
+    destinations = cmds.listConnections(
+        f"{curve}.output", s=False, d=True, p=True, scn=True,
+    )
     if destinations is None:
         return None, Status.NO_DRIVEN
 
@@ -659,7 +784,9 @@ def _resolve_route(curve):
         if len(hops) > 64:
             return None, Status.UNSUPPORTED
 
-        outputs = cmds.listConnections(f"{destination.node}.output", s=False, d=True, p=True, scn=True)
+        outputs = cmds.listConnections(
+            f"{destination.node}.output", s=False, d=True, p=True, scn=True,
+        )
         if outputs is None:
             return None, Status.NO_DRIVEN
 
@@ -678,13 +805,21 @@ def _plan_driven_key(data, policy, unlock):
     for plug in (data.driver, data.driven):
         matches = cmds.ls(plug.node)
         if not matches:
-            return PlanItem(data, PlanStatus.MISSING, f"Node not found: {plug.node}")
+            return PlanItem(
+                data, PlanStatus.MISSING, f"Node not found: {plug.node}",
+            )
 
         if len(matches) > 1:
-            return PlanItem(data, PlanStatus.AMBIGUOUS, f"Multiple nodes match: {plug.node}")
+            return PlanItem(
+                data,
+                PlanStatus.AMBIGUOUS,
+                f"Multiple nodes match: {plug.node}",
+            )
 
         if not cmds.objExists(str(plug)):
-            return PlanItem(data, PlanStatus.MISSING, f"Attribute not found: {plug}")
+            return PlanItem(
+                data, PlanStatus.MISSING, f"Attribute not found: {plug}",
+            )
 
     driver = str(data.driver)
     driven = str(data.driven)
@@ -693,21 +828,33 @@ def _plan_driven_key(data, policy, unlock):
         return PlanItem(
             data,
             PlanStatus.TYPE_MISMATCH,
-            f"{driven} requires {expected_type}, but the data is {data.curve_type}",
+            f"{driven} requires {expected_type}, "
+            f"but the data is {data.curve_type}",
         )
 
     if not unlock and cmds.getAttr(driven, l=True):
-        return PlanItem(data, PlanStatus.LOCKED, f"Attribute is locked: {driven}")
+        return PlanItem(
+            data, PlanStatus.LOCKED, f"Attribute is locked: {driven}",
+        )
 
     existing = find_driven_key(driver, driven)
     if existing is None:
-        if _has_foreign_input(driven):
-            return PlanItem(data, PlanStatus.FOREIGN_INPUT, f"{driven} has an input other than driven keys")
+        if has_foreign_input(driven):
+            return PlanItem(
+                data,
+                PlanStatus.FOREIGN_INPUT,
+                f"{driven} has an input other than driven keys",
+            )
 
         return PlanItem(data, PlanStatus.CREATE)
 
     if policy is ConflictPolicy.SKIP:
-        return PlanItem(data, PlanStatus.SKIP, f"Driven key already exists: {existing.curve}", existing.curve)
+        return PlanItem(
+            data,
+            PlanStatus.SKIP,
+            f"Driven key already exists: {existing.curve}",
+            existing.curve,
+        )
 
     return PlanItem(data, PlanStatus.REPLACE, existing=existing.curve)
 
@@ -734,7 +881,9 @@ def _apply_item(item, blend_nodes):
         try:
             skipped = write_curve(curve, data.curve)
             if skipped:
-                warnings.append(f"Skipped curve attributes: {', '.join(skipped)}")
+                warnings.append(
+                    f"Skipped curve attributes: {', '.join(skipped)}",
+                )
 
             name = build_curve_name(data.driver, data.driven, data.curve_type)
             if data.name is not None:
@@ -763,10 +912,15 @@ def _create_direct_curve(data):
     driver = str(data.driver)
     driven = str(data.driven)
     first = data.curve.keys[0]
-    cmds.setDrivenKeyframe(driven, cd=driver, dv=first.driver_value, v=first.driven_value)
+    cmds.setDrivenKeyframe(
+        driven, cd=driver, dv=first.driver_value, v=first.driven_value,
+    )
     key = find_driven_key(driver, driven)
     if key is None:
-        raise RuntimeError(f"Driven key curve was not found after keying: {driver} -> {driven}")
+        raise RuntimeError(
+            "Driven key curve was not found after keying: "
+            f"{driver} -> {driven}",
+        )
 
     return key.curve
 
@@ -780,7 +934,9 @@ def _connect_through_chain(curve, data, blend_nodes):
 
 
 def _build_blend_chain(plug, levels, blend_nodes, weight=None):
-    """Find or create each blendWeighted from the outside in, and return the innermost node.
+    """Find or create each blendWeighted from the outside in.
+
+    Return the innermost node.
 
     plugへつながるblendWeightedを外側から確保し、一番内側のノードを返す
 
@@ -803,12 +959,16 @@ def _build_blend_chain(plug, levels, blend_nodes, weight=None):
         if weight is None:
             warning = _connect_blend_to_driven(node, plug)
         else:
-            _connect_weighted(f"{node}.output", plug.rpartition(".")[0], weight)
+            _connect_weighted(
+                f"{node}.output", plug.rpartition(".")[0], weight,
+            )
 
     if len(levels) == 1:
         return node, warning
 
-    inner, _ = _build_blend_chain(f"{node}.input", levels[1:], blend_nodes, level.weight)
+    inner, _ = _build_blend_chain(
+        f"{node}.input", levels[1:], blend_nodes, level.weight,
+    )
     return inner, warning
 
 
@@ -839,7 +999,10 @@ def _connect_blend_to_driven(node, driven):
     if sources is not None:
         _disconnect_input(driven)
         _connect_weighted(sources[0], node, 1.0)
-        warning = f"{driven} already had an input from {sources[0]}; merged it into {node}"
+        warning = (
+            f"{driven} already had an input from {sources[0]}; "
+            f"merged it into {node}"
+        )
 
     cmds.connectAttr(f"{node}.output", driven)
     return warning
@@ -868,14 +1031,24 @@ def _validate_curve_attrs(driven, curve_attrs):
 
 
 def _build_key_flags(driver, driver_value, driven_value, in_type, out_type):
-    flags = {"cd": driver, "dv": driver_value, "v": driven_value, "itt": in_type, "ott": out_type}
+    flags = {
+        "cd": driver,
+        "dv": driver_value,
+        "v": driven_value,
+        "itt": in_type,
+        "ott": out_type,
+    }
     return {flag: value for flag, value in flags.items() if value is not None}
 
 
 def _rename_inserted_blend(key, driven, input_before):
     # MEMO: 2つ目のドライバーを追加すると、Mayaがドリブンの手前にblendWeightedを挿入する
     input_after = _get_input_node(driven)
-    if input_after is None or input_after == input_before or cmds.nodeType(input_after) != "blendWeighted":
+    if (
+        input_after is None
+        or input_after == input_before
+        or cmds.nodeType(input_after) != "blendWeighted"
+    ):
         return key
 
     cmds.rename(input_after, build_blend_name(Plug.parse(key.driven)))
@@ -894,7 +1067,17 @@ def _set_attr_value(plug, value):
         cmds.setAttr(plug, value)
 
 
-def _has_foreign_input(plug):
+def has_foreign_input(plug):
+    """Return whether the attribute has an input other than a driven key.
+
+    アトリビュートに、ドリブンキー以外の入力があるかを返す
+
+    Args:
+        plug (str): アトリビュート
+
+    Returns:
+        bool: animCurveとblendWeighted以外から接続されている場合はTrue
+    """
     sources = cmds.listConnections(plug, s=True, d=False, scn=True)
     if sources is None:
         return False

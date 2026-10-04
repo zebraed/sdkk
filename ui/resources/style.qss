@@ -1,0 +1,119 @@
+QStatusBar {
+    border-top: 1px solid #2b2b2b;
+}
+
+/* 現在のセルの点線の枠（フォーカス矩形）を出さない。Deleteキーなどのキー操作はそのまま使える */
+QTableView, QListWidget {
+    outline: 0;
+}
+
+QLabel#label_context[state="warning"] {
+    color: #f5c26b;
+    font-weight: bold;
+}
+
+QLabel#label_driver_node,
+QLabel#label_driven_node {
+    font-weight: bold;
+}
+
+QLabel#label_key_status {
+    font-weight: bold;
+}
+
+QPushButton#btn_key {
+    font-weight: bold;
+}
+
+/* すでにドリブンキーを動かしているDriverのアトリビュート */
+/* 通常と同じ寸法にし、色だけを変える。文字がないので余白もなくして中央に揃える */
+QRadioButton[isDriver="true"],
+QRadioButton[isDriver="false"] {
+    spacing: 0px;
+}
+
+QRadioButton[isDriver="true"]::indicator,
+QRadioButton[isDriver="false"]::indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 7px;
+    border: 2px solid #8a8a8a;
+    background-color: #3a3a3a;
+}
+
+QRadioButton[isDriver="false"]::indicator:checked {
+    background-color: #d0d0d0;
+}
+
+QRadioButton[isDriver="true"]::indicator {
+    border-color: #f5a623;
+}
+
+QRadioButton[isDriver="true"]::indicator:checked {
+    background-color: #f5a623;
+}
+
+/* DriverとDrivenの3x3: 罫線で表にする */
+QLabel[gridCell="true"] {
+    border: 1px solid #2b2b2b;
+    padding: 2px 6px;
+}
+
+QFrame#cell_driver_tx, QFrame#cell_driver_ty, QFrame#cell_driver_tz,
+QFrame#cell_driver_rx, QFrame#cell_driver_ry, QFrame#cell_driver_rz,
+QFrame#cell_driver_sx, QFrame#cell_driver_sy, QFrame#cell_driver_sz {
+    border: 1px solid #2b2b2b;
+}
+
+QLabel#label_driven_axis_x,
+QLabel#label_driven_axis_y,
+QLabel#label_driven_axis_z,
+QLabel#label_driver_axis_x,
+QLabel#label_driver_axis_y,
+QLabel#label_driver_axis_z {
+    background-color: #5a5a5a;
+    font-weight: bold;
+}
+
+QToolButton[gridCell="true"] {
+    border: 1px solid #2b2b2b;
+    border-radius: 0px;
+    background-color: #4a4a4a;
+    padding: 2px 6px;
+}
+
+QToolButton[gridCell="true"]:hover {
+    background-color: #5c5c5c;
+}
+
+/* ドリブンキーで動いているセル: 現在のドライバーはオレンジ、別のドライバーは青灰 */
+QToolButton[gridCell="true"][driven="driver"] {
+    background-color: #7a5420;
+    color: #ffe3b0;
+}
+
+QToolButton[gridCell="true"][driven="other"] {
+    background-color: #3f4f5a;
+    color: #c4d6e2;
+}
+
+/* チェックは、SDKを打つ編集対象 */
+QToolButton[gridCell="true"]:checked {
+    background-color: #5285a6;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+QToolButton[gridCell="true"][driven="driver"]:checked,
+QToolButton[gridCell="true"][driven="other"]:checked {
+    border: 2px solid #f5a623;
+}
+
+QToolButton[gridCell="true"]:disabled {
+    background-color: #3c3c3c;
+    color: #7a7a7a;
+}
+
+QToolButton[gridCell="true"][blocked="true"] {
+    color: #c9a25b;
+}

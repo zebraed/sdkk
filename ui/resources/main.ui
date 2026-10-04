@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>SdkkWindow</class>
+ <widget class="QMainWindow" name="SdkkWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>560</width>
+    <height>820</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>sdkk</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout_main">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QTabWidget" name="widget_tab">
+      <property name="currentIndex">
+       <number>0</number>
+      </property>
+      <widget class="QWidget" name="tab_setup">
+       <attribute name="title">
+        <string>SDK Setup</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_tab_setup">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_manage">
+       <attribute name="title">
+        <string>Manage</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_tab_manage"/>
+      </widget>
+      <widget class="QWidget" name="tab_mirror">
+       <attribute name="title">
+        <string>Mirror</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_tab_mirror"/>
+      </widget>
+      <widget class="QWidget" name="tab_advanced">
+       <attribute name="title">
+        <string>Advanced</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_tab_advanced"/>
+      </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>560</width>
+     <height>26</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_options">
+    <property name="title">
+     <string>Options</string>
+    </property>
+    <addaction name="act_select_on_click"/>
+    <addaction name="act_load_existing_driven"/>
+   </widget>
+   <widget class="QMenu" name="menu_tools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="menuHelp">
+    <property name="title">
+     <string>Help</string>
+    </property>
+   </widget>
+   <addaction name="menu_options"/>
+   <addaction name="menu_tools"/>
+   <addaction name="menuHelp"/>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <action name="act_select_on_click">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Select Node on Row Click</string>
+   </property>
+  </action>
+  <action name="act_load_existing_driven">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Load Existing Driven on Set Driver</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
