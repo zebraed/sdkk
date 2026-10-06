@@ -8,6 +8,7 @@ from Qt import QtCore, QtGui, QtWidgets
 from ...core.pose_keys import (
     DEFAULT_TOLERANCE,
     locate_on_strip,
+    locate_value,
     plan_strip_positions,
     settle_dragged_value,
 )
@@ -17,6 +18,15 @@ class PoseStripWidget(QtWidgets.QWidget):
     """Draws the marks and the current driver position, and handles clicks on the marks.
 
     マーカーと現在のドライバー位置を描き、マーカーへのクリックを扱う
+
+    Dragging with the left button works as a slider for the driver: the
+    value under the mouse is sent while dragging. It snaps to a mark
+    near the mouse, and to steps of 0.1 while Shift is held. It needs at
+    least two marks to know the scale.
+
+    左ボタンのドラッグは、ドライバーの値のスライダーとして働き、ドラッグ中はマウス位置の値を送る
+    マウスの近くのマーカーには吸い付き、Shiftを押している間は0.1刻みにする
+    目盛りを決めるため、マーカーが2つ以上必要
 
     Dragging a mark with the middle button moves its key, between the
     neighbouring marks. Holding Shift snaps the value to steps of 0.1.
@@ -41,12 +51,16 @@ class PoseStripWidget(QtWidgets.QWidget):
     現在位置は三角形で描き、色だけに頼らず形でも区別する
 
     Signals:
-        markClicked (float): マーカーを左クリックした。ドライバー値
+        scrubStarted (): 左ボタンを押して、ドライバーの値のスライダー操作を始めた
+        scrubbed (float): スライダー操作で、ドライバーの値が決まった
+        scrubFinished (): 左ボタンを離して、スライダー操作を終えた
         markMoved (float, float): マーカーを中ボタンのドラッグで動かした。元のドライバー値、新しいドライバー値
         contextTriggered (str, float): コンテキストメニューの項目を選んだ。項目のid、ドライバー値
     """
 
-    markClicked = QtCore.Signal(float)
+    scrubStarted = QtCore.Signal()
+    scrubbed = QtCore.Signal(float)
+    scrubFinished = QtCore.Signal()
     markMoved = QtCore.Signal(float, float)
     contextTriggered = QtCore.Signal(str, float)
 
@@ -65,6 +79,7 @@ class PoseStripWidget(QtWidgets.QWidget):
         self._hover = None
         self._actions = []
         self._drag = None
+        self._scrubbing = False
         self.setMouseTracking(True)
         self.setMinimumHeight(78)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -186,6 +201,32 @@ class PoseStripWidget(QtWidgets.QWidget):
         )
         return drag["value"] if value is None else value
 
+    def _get_scrub_value(self, event):
+        values, fractions, xs = self._layout_marks()
+        usable = max(self.width() - self._SIDE * 2, 1)
+        x = event.pos().x()
+        raw = locate_value(values, fractions, (x - self._SIDE) / usable)
+        if raw is None:
+            return None
+
+        if event.modifiers() & QtCore.Qt.ShiftModifier:
+            return round(round(raw / self._DRAG_STEP) * self._DRAG_STEP, 3)
+
+        for mark, mark_x in zip(self._marks, xs):
+            if abs(x - mark_x) <= self._SNAP_PX:
+                return mark.value
+
+        return round(raw, 3)
+
+    def _scrub_to(self, event):
+        value = self._get_scrub_value(event)
+        if value is None:
+            return
+
+        self._current = value
+        self.update()
+        self.scrubbed.emit(value)
+
     def _find_mark_at(self, pos):
         _, _, xs = self._layout_marks()
         for mark, x in zip(self._marks, xs):
@@ -197,6 +238,10 @@ class PoseStripWidget(QtWidgets.QWidget):
         return None
 
     def mouseMoveEvent(self, event):
+        if self._scrubbing:
+            self._scrub_to(event)
+            return
+
         if self._drag is not None:
             self._update_drag(event)
             self.update()
@@ -218,13 +263,13 @@ class PoseStripWidget(QtWidgets.QWidget):
         super().leaveEvent(event)
 
     def mousePressEvent(self, event):
-        if event.button() == QtCore.Qt.LeftButton:
-            mark = self._find_mark_at(event.pos())
-            if mark is not None:
-                self.markClicked.emit(mark.value)
-                return
+        if event.button() == QtCore.Qt.LeftButton and self._drag is None:
+            self._scrubbing = True
+            self.scrubStarted.emit()
+            self._scrub_to(event)
+            return
 
-        if event.button() == QtCore.Qt.MiddleButton:
+        if event.button() == QtCore.Qt.MiddleButton and not self._scrubbing:
             mark = self._find_mark_at(event.pos())
             if mark is not None:
                 self._start_drag(event, mark)
@@ -233,6 +278,12 @@ class PoseStripWidget(QtWidgets.QWidget):
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton and self._scrubbing:
+            self._scrub_to(event)
+            self._scrubbing = False
+            self.scrubFinished.emit()
+            return
+
         if event.button() == QtCore.Qt.MiddleButton and self._drag is not None:
             # 動かさずにShiftを押し離しした場合も反映する
             self._update_drag(event)

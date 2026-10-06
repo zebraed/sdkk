@@ -85,12 +85,16 @@
      <height>26</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menu_history">
+    <property name="title">
+     <string>History</string>
+    </property>
+   </widget>
    <widget class="QMenu" name="menu_options">
     <property name="title">
      <string>Options</string>
     </property>
     <addaction name="act_select_on_click"/>
-    <addaction name="act_load_existing_driven"/>
    </widget>
    <widget class="QMenu" name="menu_tools">
     <property name="title">
@@ -102,6 +106,7 @@
      <string>Help</string>
     </property>
    </widget>
+   <addaction name="menu_history"/>
    <addaction name="menu_options"/>
    <addaction name="menu_tools"/>
    <addaction name="menuHelp"/>
@@ -116,17 +121,6 @@
    </property>
    <property name="text">
     <string>Select Node on Row Click</string>
-   </property>
-  </action>
-  <action name="act_load_existing_driven">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="checked">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Load Existing Driven on Set Driver</string>
    </property>
   </action>
  </widget>

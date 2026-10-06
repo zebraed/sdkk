@@ -8,7 +8,7 @@ import logging
 
 from maya import cmds
 
-from .utils import undo_chunk
+from .maya_utils import undo_chunk
 from .command import animation, drivenkey
 from .command.drivenkey import (
     find_driven_key,
@@ -388,6 +388,42 @@ def remove_driven_keys_at(driver, driven_plugs, driver_value):
         driver,
     )
     return removed
+
+
+@undo_chunk
+def delete_driven_key(driver, driven):
+    """Delete the driven key of a driver/driven pair.
+
+    ドライバーとドリブンの組のドリブンキーを削除する
+
+    Driven keys of the same attribute from other drivers are left as
+    they are. A blendWeighted left without inputs is removed.
+
+    同じドリブンアトリビュートの、ほかのドライバーのドリブンキーは残す
+    入力がなくなったblendWeightedは消す
+
+    Args:
+        driver (str): ドライバーアトリビュート
+        driven (str): ドリブンアトリビュート
+
+    Returns:
+        str: 削除したanimCurveノード名
+
+    Raises:
+        ValueError: ドリブンキーがない場合
+
+    Examples:
+        >>> import sdkk
+        >>> sdkk.delete_driven_key("jaw_ctl.rotateX", "lip_L_jnt.translateY")
+        'jaw_ctl_rotateX_to_lip_L_jnt_translateY_animCurveUL'
+    """
+    key = find_driven_key(driver, driven)
+    if key is None:
+        raise ValueError(f"Driven key not found: {driver} -> {driven}")
+
+    key.delete()
+    logger.info("Deleted driven key %s (%s -> %s)", key.curve, driver, driven)
+    return key.curve
 
 
 @undo_chunk

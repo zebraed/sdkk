@@ -12,7 +12,7 @@ from typing import Optional
 
 from maya import cmds
 
-from .. import utils
+from .. import maya_utils
 from ..core.model import (
     BlendData,
     DrivenKeyData,
@@ -530,7 +530,7 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
     warnings = []
     # 名前の衝突でMayaが別名を付けたノードも同じ段として見つけられるよう、作ったノードを覚えておく
     blend_nodes = {}
-    with utils.scene_units(linear_unit, angle_unit):
+    with maya_utils.scene_units(linear_unit, angle_unit):
         for item in items:
             if not item.status.is_applicable:
                 skipped.append(item)
@@ -872,7 +872,7 @@ def _read_existing_data(item):
 
 def _apply_item(item, blend_nodes):
     data = item.data
-    with utils.unlocked_attr(str(data.driven)):
+    with maya_utils.unlocked_attr(str(data.driven)):
         if item.existing is not None:
             DrivenKey.from_curve(item.existing).delete()
 

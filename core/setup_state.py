@@ -1,11 +1,11 @@
 """
 Maya-free state of the SDK Setup screen: which driver and which driven attributes are in use.
 
-SDK Setup画面の状態（どれをドライバーに、どのアトリビュートをドリブンにしているか）。Mayaを使わない
+SDK Setup画面の状態（どれをドライバーに、どのアトリビュートをドリブンにしているか）
 """
 from dataclasses import dataclass, replace
 
-# (長いアトリビュート名, 短縮記号)。GUIの行の並び（T・R・S）
+
 TRANSFORM_KINDS = (("translate", "T"), ("rotate", "R"), ("scale", "S"))
 AXES = ("X", "Y", "Z")
 

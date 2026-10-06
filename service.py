@@ -10,11 +10,13 @@ from typing import Optional
 from maya import cmds
 
 from .command import drivenkey, scene
+from .core.history import HistoryEntry, parse_history
 from .core.model import Plug
 from .core.pose_keys import PoseSummary, summarize_pose_keys
-from .core.setup_state import TRANSFORM_ATTRS
+from .core.setup_state import TRANSFORM_ATTRS, DriverSpec, SetupState
 
 SETTINGS_KEY = "sdkk_window_settings"
+HISTORY_KEY = "sdkk_history"
 
 
 @dataclass(frozen=True)
@@ -27,11 +29,13 @@ class NodeInfo:
         uuid (str): ノードのUUID
         name (str): ロングネーム
         short_name (str): 表示用の名前（DAGパスの最後の要素）
+        icon (Optional[str]): アウトライナーと同じアイコンのリソース名。見つからなければNone
     """
 
     uuid: str
     name: str
     short_name: str
+    icon: Optional[str] = None
 
     @classmethod
     def from_name(cls, name):
@@ -43,7 +47,12 @@ class NodeInfo:
         Returns:
             NodeInfo: 作成した結果
         """
-        return cls(scene.get_node_uuid(name), name, name.rpartition("|")[2])
+        return cls(
+            scene.get_node_uuid(name),
+            name,
+            name.rpartition("|")[2],
+            scene.find_node_icon(name),
+        )
 
 
 @dataclass(frozen=True)
@@ -122,7 +131,9 @@ def read_snapshot(state, detail_uuid=None, target_uuids=()):
     for uuid in dict.fromkeys(uuids):
         name = scene.find_node(uuid)
         if name is not None:
-            nodes[uuid] = NodeInfo(uuid, name, name.rpartition("|")[2])
+            nodes[uuid] = NodeInfo(
+                uuid, name, name.rpartition("|")[2], scene.find_node_icon(name),
+            )
 
     driver_attrs = ()
     if state.driver is not None and state.driver.uuid in nodes:
@@ -326,14 +337,7 @@ def read_settings():
     Returns:
         dict: 設定。保存がない、または読めない場合は空
     """
-    if not cmds.optionVar(exists=SETTINGS_KEY):
-        return {}
-
-    try:
-        settings = json.loads(cmds.optionVar(q=SETTINGS_KEY))
-    except (TypeError, ValueError):
-        return {}
-
+    settings = _read_option(SETTINGS_KEY)
     return settings if isinstance(settings, dict) else {}
 
 
@@ -346,3 +350,152 @@ def write_settings(settings):
         settings (dict): JSONにできる設定
     """
     cmds.optionVar(sv=(SETTINGS_KEY, json.dumps(settings)))
+
+
+def read_history():
+    """Read the saved history of driver and driven sets.
+
+    保存してあるドライバーとドリブンの組の履歴を読む
+
+    Returns:
+        tuple[HistoryEntry, ...]: 新しい順の履歴。保存がない、または読めない場合は空
+    """
+    items = _read_option(HISTORY_KEY)
+    return parse_history(items) if isinstance(items, list) else ()
+
+
+def write_history(entries):
+    """Save the history, to the optionVar. The scene is not touched.
+
+    履歴をoptionVarへ保存する。シーンには触れない
+
+    Args:
+        entries (Iterable[HistoryEntry]): 新しい順の履歴
+    """
+    cmds.optionVar(sv=(HISTORY_KEY, json.dumps([entry.to_dict() for entry in entries])))
+
+
+def build_history_entry(state):
+    """Build the history entry of the current driver and driven set.
+
+    現在のドライバーとドリブンの組から、履歴の項目を作る
+
+    Args:
+        state (SetupState): 画面の状態
+
+    Returns:
+        Optional[HistoryEntry]: 履歴の項目。ドライバーのアトリビュートがない、シーンにない、
+            または有効なドリブンのアトリビュートがない場合はNone
+    """
+    driver = state.driver
+    if driver is None or driver.attr is None:
+        return None
+
+    driver_name = scene.find_node(driver.uuid)
+    if driver_name is None:
+        return None
+
+    driven = []
+    for node in state.driven:
+        name = scene.find_node(node.uuid)
+        if name is not None and node.attrs:
+            driven.append((name, node.attrs))
+
+    if not driven:
+        return None
+
+    return HistoryEntry(driver_name, driver.attr, driven)
+
+
+def refresh_history(entries):
+    """Bring the history up to date with the scene, and drop the sets that are gone.
+
+    履歴をシーンの現在の状態に合わせ、なくなった組は外す
+
+    Each entry is rebuilt from the driven keys the driver drives now, so
+    driven nodes and attributes that have been deleted are not kept. An
+    entry whose driver node is gone, or whose driver drives nothing any
+    more, is dropped. If the driver attribute of an entry drives nothing
+    now but another attribute of the node does, that one is used.
+
+    各項目は、ドライバーが今動かしているドリブンキーから作り直すため、削除したドリブンのノードや
+    アトリビュートは残らない。ドライバーのノードがない、またはドライバーが何も動かしていない項目は外す
+    項目のドライバーのアトリビュートが今は何も動かしておらず、同じノードの別のアトリビュートが
+    動かしている場合は、そちらを使う
+
+    Args:
+        entries (Iterable[HistoryEntry]): 新しい順の履歴
+
+    Returns:
+        tuple[HistoryEntry, ...]: 更新した履歴。順序は保つ
+    """
+    refreshed = (_refresh_history_entry(entry) for entry in entries)
+    return tuple(entry for entry in refreshed if entry is not None)
+
+
+def restore_state(entry):
+    """Build the state of a history entry, with the nodes found in the scene.
+
+    履歴の項目の状態を、シーンで見つかったノードで作る
+
+    Args:
+        entry (HistoryEntry): 履歴の項目
+
+    Returns:
+        tuple[SetupState, tuple[str, ...]]: 状態と、シーンで見つからなかった（または名前が
+            曖昧な）ノードの名前
+    """
+    missing = []
+    uuid = scene.find_uuid(entry.driver_node)
+    driver = None
+    if uuid is None:
+        missing.append(entry.driver_node)
+    else:
+        driver = DriverSpec(uuid, entry.driver_attr)
+
+    state = SetupState().with_driver(driver)
+    for name, attrs in entry.driven:
+        uuid = scene.find_uuid(name)
+        if uuid is None:
+            missing.append(name)
+            continue
+
+        state = state.add_nodes([uuid])
+        for attr in attrs:
+            state = state.with_driven_attr(uuid, attr, True)
+
+    return state, tuple(missing)
+
+
+def _read_option(key):
+    if not cmds.optionVar(exists=key):
+        return None
+
+    try:
+        return json.loads(cmds.optionVar(q=key))
+    except (TypeError, ValueError):
+        return None
+
+
+def _refresh_history_entry(entry):
+    uuid = scene.find_uuid(entry.driver_node)
+    if uuid is None:
+        return None
+
+    attrs = list_driver_attrs(uuid)
+    if not attrs:
+        return None
+
+    attr = entry.driver_attr if entry.driver_attr in attrs else attrs[0]
+    driven = {}
+    for driven_uuid, driven_attr in list_driven_of(DriverSpec(uuid, attr)):
+        name = scene.find_node(driven_uuid)
+        if name is not None:
+            driven.setdefault(name, []).append(driven_attr)
+
+    if not driven:
+        return None
+
+    return HistoryEntry(
+        entry.driver_node, attr, [(name, tuple(each)) for name, each in driven.items()],
+    )

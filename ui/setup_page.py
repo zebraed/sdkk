@@ -8,10 +8,12 @@ import os
 
 from Qt import QtCompat, QtCore, QtGui, QtWidgets
 
-from .. import ops, service
+from .. import gui_ops, ops, service
+from ..core.history import push_history
 from ..core.setup_state import AXES, TRANSFORM_KINDS, DriverSpec, SetupState
 from .driven_node_model import DrivenNodeModel
 from .maya_events import SceneWatcher
+from .node_icons import get_node_icon
 from .widgets.attr_picker import AttrPicker
 from .widgets.collapsible_group import CollapsibleGroup
 from .widgets.pose_strip import PoseStripWidget
@@ -32,7 +34,6 @@ class SetupPage(QtWidgets.QWidget):
 
     Args:
         select_on_click (QtWidgets.QAction): 行クリックでMayaの選択を切り替えるかを決めるチェック付きアクション
-        load_existing (QtWidgets.QAction): ドライバーを決めたとき、既存のドリブンを読み込むかを決めるチェック付きアクション
         parent (Optional[QtWidgets.QWidget]): 親
 
     Signals:
@@ -41,11 +42,10 @@ class SetupPage(QtWidgets.QWidget):
 
     statusChanged = QtCore.Signal(str, bool)
 
-    def __init__(self, select_on_click, load_existing, parent=None):
+    def __init__(self, select_on_click, parent=None):
         super().__init__(parent)
         QtCompat.loadUi(UI_PATH, self)
         self._select_on_click = select_on_click
-        self._load_existing = load_existing
 
         self._state = SetupState()
         self._snapshot = None
@@ -53,7 +53,10 @@ class SetupPage(QtWidgets.QWidget):
         self._driver_custom_view = False
         self._rendering = False
         self._pending_reset = False
+        self._scrub = None
         self._tracked = ()
+        self._history = service.read_history()
+        self._cleared_key = None
 
         self._find_widgets()
         self._setup_widgets()
@@ -122,6 +125,7 @@ class SetupPage(QtWidgets.QWidget):
 
     def _find_widgets(self):
         find = self._find
+        self._label_driver_icon = find(QtWidgets.QLabel, "label_driver_icon")
         self._label_driver_node = find(QtWidgets.QLabel, "label_driver_node")
         self._btn_set_selected = find(QtWidgets.QPushButton, "btn_set_selected")
         self._radio_driver_transform = find(QtWidgets.QRadioButton, "radio_driver_transform")
@@ -132,6 +136,7 @@ class SetupPage(QtWidgets.QWidget):
 
         self._btn_add = find(QtWidgets.QPushButton, "btn_add")
         self._table = find(QtWidgets.QTableView, "table_driven_nodes")
+        self._label_driven_icon = find(QtWidgets.QLabel, "label_driven_icon")
         self._label_driven_node = find(QtWidgets.QLabel, "label_driven_node")
         self._radio_driven_transform = find(QtWidgets.QRadioButton, "radio_driven_transform")
         self._radio_driven_custom = find(QtWidgets.QRadioButton, "radio_driven_custom")
@@ -214,7 +219,9 @@ class SetupPage(QtWidgets.QWidget):
         self._picker_driven.attrPicked.connect(self._on_driven_attr_picked)
         self._list_custom.customContextMenuRequested.connect(self._on_custom_menu)
 
-        self._strip.markClicked.connect(self._on_mark_clicked)
+        self._strip.scrubStarted.connect(self._on_scrub_started)
+        self._strip.scrubbed.connect(self._on_scrubbed)
+        self._strip.scrubFinished.connect(self._on_scrub_finished)
         self._strip.markMoved.connect(self._on_mark_moved)
         self._strip.contextTriggered.connect(self._on_strip_action)
         self._btn_key.clicked.connect(self._on_key_clicked)
@@ -243,6 +250,7 @@ class SetupPage(QtWidgets.QWidget):
         self._snapshot = service.read_snapshot(
             self._state, self._current_uuid, self._resolve_target_uuids(),
         )
+        self._record_history_if_driven()
         names = tuple(info.name for info in self._snapshot.nodes.values())
         if names != self._tracked:
             self._tracked = names
@@ -251,7 +259,9 @@ class SetupPage(QtWidgets.QWidget):
         self._render()
 
     def _schedule_refresh(self):
-        self._timer.start()
+        # スライダー操作中は、離すまで再描画しない（操作の邪魔になるため）
+        if self._scrub is None:
+            self._timer.start()
 
     def _schedule_reset(self):
         self._pending_reset = True
@@ -266,8 +276,39 @@ class SetupPage(QtWidgets.QWidget):
         self._refresh()
 
     def _apply_driver(self, driver):
-        state = self._state.with_driver(driver)
-        if driver.attr is not None and self._load_existing.isChecked():
+        """Set the driver. The driven list follows the driver attribute.
+
+        ドライバーを設定する。ドリブンの一覧は、ドライバーのアトリビュートに従う
+
+        Changing the driver node or the driver attribute replaces the
+        list with the driven nodes that this driver attribute already
+        drives, so the list never mixes in the nodes of another
+        attribute. Setting the first driver, or choosing the attribute
+        of a driver that had none, keeps the nodes already added, and
+        adds the existing ones to them.
+
+        ドライバーのノードかアトリビュートを変えると、一覧は、そのドライバーのアトリビュートがすでに
+        動かしているドリブンに置き換え、別のアトリビュートのノードが混ざらないようにする
+        最初のドライバーの設定や、アトリビュート未選択のドライバーへ選ぶ場合は、すでに追加した
+        ノードを残し、既存のドリブンを加える
+
+        Args:
+            driver (DriverSpec): 新しいドライバー
+        """
+        previous = self._state.driver
+        if driver == previous:
+            self._set_state(self._state)
+            return
+
+        keeps_nodes = previous is None or (
+            previous.uuid == driver.uuid and previous.attr is None
+        )
+        state = self._state if keeps_nodes else SetupState()
+        if not keeps_nodes:
+            self._current_uuid = None
+
+        state = state.with_driver(driver)
+        if driver.attr is not None:
             for uuid, attr in service.list_driven_of(driver):
                 state = state.add_nodes([uuid]).with_driven_attr(uuid, attr, True)
 
@@ -362,25 +403,35 @@ class SetupPage(QtWidgets.QWidget):
             return
 
         nodes = [self._state.get_driven(uuid) for uuid in self._selected_uuids()]
-        menu = QtWidgets.QMenu(self)
-        curve_actions = self._add_curve_menu(menu, [(n.uuid, a) for n in nodes for a in n.attrs])
-        menu.addSeparator()
-        remove = menu.addAction("Remove")
-        chosen = menu.exec_(self._table.viewport().mapToGlobal(pos))
-        if chosen in curve_actions:
-            self._select_scene_node(curve_actions[chosen])
-        elif chosen is remove:
-            self._remove_selected_nodes()
+        self._exec_item_menu(
+            self._table.viewport().mapToGlobal(pos),
+            [(n.uuid, a) for n in nodes for a in n.attrs],
+            self._remove_selected_nodes,
+        )
 
     def _on_cell_menu(self, attr, button, pos):
         if self._current_uuid is None:
             return
 
+        self._exec_item_menu(button.mapToGlobal(pos), [(self._current_uuid, attr)])
+
+    def _exec_item_menu(self, global_pos, targets, on_remove=None):
+        # Select Anim Curve ▶、区切り、Remove Item、区切り、Delete DrivenKey ▶ の順に並べる
         menu = QtWidgets.QMenu(self)
-        curve_actions = self._add_curve_menu(menu, [(self._current_uuid, attr)])
-        chosen = menu.exec_(button.mapToGlobal(pos))
+        curve_actions = self._add_curve_menu(menu, targets)
+        remove = None
+        if on_remove is not None:
+            menu.addSeparator()
+            remove = menu.addAction("Remove Item")
+
+        delete_actions = self._add_delete_menu(menu, targets)
+        chosen = menu.exec_(global_pos)
         if chosen in curve_actions:
             self._select_scene_node(curve_actions[chosen])
+        elif remove is not None and chosen is remove:
+            on_remove()
+        elif chosen in delete_actions:
+            self._delete_driven_key(*delete_actions[chosen])
 
     def _add_curve_menu(self, menu, targets):
         # 子メニューにanimCurveの名前を並べ、blendWeightedは区切り線の下の一番下に並べる
@@ -397,6 +448,49 @@ class SetupPage(QtWidgets.QWidget):
                 actions[submenu.addAction(name)] = name
 
         return actions
+
+    def _add_delete_menu(self, menu, targets):
+        # ドリブンキーがあるアトリビュートだけを並べる
+        # ドライバーが決まっていれば、そのドライバーのドリブンキーがあるものだけ
+        snapshot = self._snapshot
+        menu.addSeparator()
+        submenu = menu.addMenu("Delete DrivenKey")
+        actions = {}
+        for uuid, attr in dict.fromkeys(targets):
+            state = snapshot.driven_state.get((uuid, attr))
+            info = snapshot.nodes.get(uuid)
+            if state is None or info is None:
+                continue
+
+            if snapshot.driver_plug is not None and state != "driver":
+                continue
+
+            actions[submenu.addAction(f"{info.short_name}.{attr}")] = (uuid, attr)
+
+        submenu.setEnabled(bool(actions))
+        return actions
+
+    def _delete_driven_key(self, uuid, attr):
+        snapshot = self._snapshot
+        info = snapshot.nodes[uuid]
+        plug = f"{info.name}.{attr}"
+        error = None
+        try:
+            if snapshot.driver_plug is not None:
+                ops.delete_driven_key(snapshot.driver_plug, plug)
+            else:
+                ops.delete_driven_keys([plug])
+        except (RuntimeError, ValueError) as exc:
+            error = f"⚠ Cannot delete the driven key of {info.short_name}.{attr}: {exc}"
+        else:
+            # ドリブンキーがなくなったアトリビュートは、ノードの有効なアトリビュートからも外す
+            self._state = self._state.with_driven_attr(uuid, attr, False)
+
+        self._refresh()
+        if error is not None:
+            self._notify(error)
+        else:
+            self._notify(f"Deleted the driven key of {info.short_name}.{attr}", warning=False)
 
     def _select_scene_node(self, name):
         service.select_scene_nodes([name])
@@ -438,15 +532,11 @@ class SetupPage(QtWidgets.QWidget):
             (self._current_uuid, item.data(ATTR_ROLE))
             for item in self._list_custom.selectedItems()
         ]
-        menu = QtWidgets.QMenu(self)
-        curve_actions = self._add_curve_menu(menu, targets)
-        menu.addSeparator()
-        remove = menu.addAction("Remove")
-        chosen = menu.exec_(self._list_custom.viewport().mapToGlobal(pos))
-        if chosen in curve_actions:
-            self._select_scene_node(curve_actions[chosen])
-        elif chosen is remove:
-            self._remove_selected_custom()
+        self._exec_item_menu(
+            self._list_custom.viewport().mapToGlobal(pos),
+            targets,
+            self._remove_selected_custom,
+        )
 
     def _remove_selected_custom(self):
         state = self._state
@@ -467,16 +557,128 @@ class SetupPage(QtWidgets.QWidget):
 
         return super().eventFilter(obj, event)
 
+    # --- history ---
+    def list_history(self):
+        """List the history of driver and driven sets, newest first.
+
+        ドライバーとドリブンの組の履歴を、新しい順に返す
+
+        The history is brought up to date with the scene first, so sets
+        that are gone are dropped, and the driven nodes are the ones
+        driven now.
+
+        先に履歴をシーンの現在の状態に合わせるため、なくなった組は外れ、ドリブンは今動かされているものになる
+
+        Returns:
+            tuple[HistoryEntry, ...]: 履歴
+        """
+        history = service.refresh_history(self._history)
+        if history != self._history:
+            self._history = history
+            service.write_history(history)
+
+        return history
+
+    def clear_history(self):
+        """Clear the whole history.
+
+        履歴をすべて消す
+
+        The set on the screen is not recorded again until another set is
+        used or a key is set on it, since it would come right back on the
+        next redraw.
+
+        画面にある組は、次の再描画ですぐ戻ってしまうため、別の組を使うか、その組にキーを打つまで
+        履歴に記録しない
+        """
+        entry = service.build_history_entry(self._state)
+        self._cleared_key = None if entry is None else entry.key
+        self._history = ()
+        service.write_history(self._history)
+        self._notify("History cleared", warning=False)
+
+    def restore_history(self, entry):
+        """Set the driver and the driven nodes of a history entry on the screen.
+
+        履歴の項目のドライバーとドリブンを、画面に設定する
+
+        Nodes that are not in the scene are left out and reported.
+
+        シーンにないノードは外し、警告する
+
+        Args:
+            entry (HistoryEntry): 履歴の項目
+        """
+        state, missing = service.restore_state(entry)
+        self._driver_custom_view = (
+            state.driver is not None and not state.driver.is_transform
+        )
+        self._current_uuid = None
+        self._set_state(state)
+        if missing:
+            names = ", ".join(name.rpartition("|")[2] for name in missing)
+            self._notify(f"⚠ Not found in the scene: {names}")
+
+    def _record_history_if_driven(self):
+        # ドライバーのドリブンキーがすでにある組は、Keyを打たなくても履歴に残す
+        driven = self._snapshot.driven_state
+        if not any(driven.get(key) == "driver" for key in self._state.list_plug_keys()):
+            return
+
+        entry = service.build_history_entry(self._state)
+        if entry is None or entry.key == self._cleared_key:
+            return
+
+        self._cleared_key = None
+        history = push_history(self._history, entry)
+        # 再描画のたびに来るため、変わらないときは保存しない
+        if history != self._history:
+            self._history = history
+            service.write_history(history)
+
     # --- key ---
-    def _on_mark_clicked(self, value):
+    def _on_scrub_started(self):
         snapshot = self._snapshot
-        if snapshot.driver_plug is None:
+        self._scrub = {
+            "plug": snapshot.driver_plug,
+            "start": snapshot.driver_value,
+            "value": None,
+            "error": None,
+        }
+
+    def _on_scrubbed(self, value):
+        scrub = self._scrub
+        if scrub is None or scrub["plug"] is None:
             return
 
         try:
-            ops.set_driver_value(snapshot.driver_plug, value)
+            gui_ops.preview_driver_value(scrub["plug"], value)
         except RuntimeError as exc:
-            self._notify(f"⚠ Cannot move {snapshot.driver_plug}: {exc}")
+            scrub["error"] = str(exc)
+            return
+
+        scrub["value"] = value
+        text = _format(value, 3)
+        self._label_pose_driver.setText(f"Driver : {text}")
+        self._label_driver_value.setText(text)
+
+    def _on_scrub_finished(self):
+        scrub = self._scrub
+        self._scrub = None
+        error = None
+        if scrub is not None and scrub["plug"] is not None:
+            try:
+                if scrub["error"] is not None:
+                    raise RuntimeError(scrub["error"])
+
+                if scrub["value"] is not None:
+                    gui_ops.commit_driver_value(scrub["plug"], scrub["start"], scrub["value"])
+            except RuntimeError as exc:
+                error = f"⚠ Cannot move {scrub['plug']}: {exc}"
+
+        self._refresh()
+        if error is not None:
+            self._notify(error)
 
     def _on_mark_moved(self, old, new):
         snapshot = self._snapshot
@@ -509,6 +711,8 @@ class SetupPage(QtWidgets.QWidget):
             ops.set_driven_keys(snapshot.driver_plug, snapshot.key_plugs)
         except (RuntimeError, ValueError) as exc:
             error = f"⚠ Key failed: {exc}"
+        else:
+            self._cleared_key = None
 
         # 再描画がStatusBarを書き換えるため、エラーは再描画のあとに出す
         self._refresh()
@@ -543,6 +747,10 @@ class SetupPage(QtWidgets.QWidget):
         value = _format(snapshot.driver_value, 3)
 
         self._label_driver_node.setText("(not set)" if name is None else name)
+        _set_node_icon(
+            self._label_driver_icon,
+            None if driver is None else snapshot.nodes.get(driver.uuid),
+        )
         self._label_driver_attr.setText("-" if attr is None else attr)
         self._label_driver_value.setText(value)
         if name is None:
@@ -580,6 +788,7 @@ class SetupPage(QtWidgets.QWidget):
 
         node = state.get_driven(self._current_uuid)
         info = None if node is None else snapshot.nodes.get(node.uuid)
+        _set_node_icon(self._label_driven_icon, info)
         if node is None:
             self._label_driven_node.setText("(no node selected)")
         else:
@@ -676,6 +885,14 @@ def _format(value, digits):
 
 def _plural(count, word):
     return word if count == 1 else f"{word}s"
+
+
+def _set_node_icon(label, info):
+    icon = get_node_icon(None if info is None else info.icon)
+    if icon.isNull():
+        label.clear()
+    else:
+        label.setPixmap(icon.pixmap(16, 16))
 
 
 def _show_page(stack, index):

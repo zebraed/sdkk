@@ -3,6 +3,8 @@ Queries about the scene that the GUI needs.
 
 GUIが必要とするシーンのクエリ
 """
+import os
+
 from maya import cmds
 
 from ..core.model import Plug
@@ -14,6 +16,61 @@ NUMERIC_TYPES = frozenset({
     "double", "float", "long", "short", "byte",
     "doubleLinear", "doubleAngle", "floatLinear", "floatAngle", "time",
 })
+
+
+# アウトライナーのアイコンのファイル名の一覧と、ノードタイプごとの探索結果
+# 探索はMayaへの問い合わせを伴うため、1度だけ行って使い回す
+_icon_cache = {"files": None, "types": {}}
+
+
+def find_node_icon(node):
+    """Find the icon the Outliner shows for a node, as a Qt resource name.
+
+    アウトライナーがノードに出すアイコンを、Qtのリソース名で探す
+
+    A transform with a shape gets the icon of the shape, as the Outliner
+    does. A type without its own icon gets the icon of the nearest type
+    it inherits from.
+
+    シェイプを持つトランスフォームは、アウトライナーと同じくシェイプのアイコンにする
+    専用のアイコンがないタイプは、継承元のうち最も近いタイプのアイコンにする
+
+    Args:
+        node (str): ノード名
+
+    Returns:
+        Optional[str]: リソース名（":/out_joint.png"など）。見つからなければNone
+    """
+    node_type = cmds.nodeType(node)
+    if cmds.objectType(node, isAType="transform"):
+        shapes = cmds.listRelatives(node, s=True, ni=True)
+        if shapes is not None:
+            node_type = cmds.nodeType(shapes[0])
+
+    found = _icon_cache["types"]
+    if node_type not in found:
+        found[node_type] = _search_icon(node_type)
+
+    return found[node_type]
+
+
+def _search_icon(node_type):
+    files = _icon_cache["files"]
+    if files is None:
+        names = cmds.resourceManager(nf="out_*")
+        names = [] if names is None else names
+        # 拡張子はMayaのバージョンで変わるため、外した名前から引く
+        files = {os.path.splitext(name)[0]: name for name in names}
+        _icon_cache["files"] = files
+
+    chain = cmds.nodeType(node_type, isTypeName=True, inherited=True)
+    chain = [node_type] if chain is None else chain
+    for each in reversed(chain):
+        name = files.get(f"out_{each}")
+        if name is not None:
+            return f":/{name}"
+
+    return None
 
 
 def list_selected_nodes():
@@ -41,6 +98,24 @@ def get_node_uuid(node):
         str: ノードのUUID
     """
     return cmds.ls(node, uuid=True)[0]
+
+
+def find_uuid(name):
+    """Find the UUID of the node with the name.
+
+    名前のノードのUUIDを探す
+
+    Args:
+        name (str): ノード名。ロングネームで渡す
+
+    Returns:
+        Optional[str]: ノードのUUID。存在しない、または同じ名前のノードが複数ある場合はNone
+    """
+    found = cmds.ls(name, uuid=True)
+    if found is None or len(found) != 1:
+        return None
+
+    return found[0]
 
 
 def find_node(uuid):

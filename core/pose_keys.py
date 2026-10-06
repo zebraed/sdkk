@@ -1,7 +1,7 @@
 """
 Maya-free summary of the keys on the driver: the pose strip marks and how many attributes are keyed.
 
-ドライバー上のキーの集計（ポーズストリップのマーカーと、キーが打たれたアトリビュートの数）。Mayaを使わない
+ドライバー上のキーの集計（ポーズストリップのマーカーと、キーが打たれたアトリビュートの数）
 """
 import math
 from dataclasses import dataclass
@@ -237,6 +237,38 @@ def settle_dragged_value(raw, lower=None, upper=None, margin=0.001, digits=3, st
         value = min(value, upper - margin)
 
     return round(value, digits)
+
+
+def locate_value(values, positions, fraction):
+    """Return the driver value at a position on the strip. The inverse of locate_on_strip.
+
+    ストリップ上の位置にあたるドライバー値を返す。locate_on_stripの逆
+
+    A position outside the marks is extended along the nearest end segment.
+
+    マーカーの範囲外の位置は、端の区間をそのまま延ばして求める
+
+    Args:
+        values (Sequence[float]): 昇順のマーカーのドライバー値
+        positions (Sequence[float]): valuesと同じ数の、マーカーの位置（0.0から1.0）
+        fraction (float): ストリップ上の位置。0.0から1.0の外も指定できる
+
+    Returns:
+        Optional[float]: ドライバー値。マーカーが2つ未満で傾きを決められなければNone
+    """
+    if len(values) < 2:
+        return None
+
+    if fraction <= positions[0]:
+        index = 0
+    elif fraction >= positions[-1]:
+        index = len(values) - 2
+    else:
+        index = max(i for i in range(len(values) - 1) if positions[i] <= fraction)
+
+    start, end = positions[index], positions[index + 1]
+    ratio = (fraction - start) / (end - start)
+    return values[index] + ratio * (values[index + 1] - values[index])
 
 
 def locate_on_strip(values, positions, value):

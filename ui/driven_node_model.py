@@ -5,6 +5,8 @@ Table model of the driven nodes: Node and Attributes.
 """
 from Qt import QtCore
 
+from .node_icons import get_node_icon
+
 COLUMNS = ("Node", "Attributes")
 UUID_ROLE = QtCore.Qt.UserRole
 
@@ -12,7 +14,7 @@ UUID_ROLE = QtCore.Qt.UserRole
 class DrivenNodeModel(QtCore.QAbstractTableModel):
     """Shows a SetupState's driven nodes. It only displays; the page edits the state.
 
-    SetupStateのドリブンのノードを表示する。表示専用で、状態の編集は画面側が行う
+    SetupStateのドリブンのノードを表示する
     """
 
     def __init__(self, parent=None):
@@ -96,6 +98,9 @@ class DrivenNodeModel(QtCore.QAbstractTableModel):
                 return "(missing node)" if info is None else info.short_name
 
             return node.attr_summary or "-"
+
+        if role == QtCore.Qt.DecorationRole and column == 0 and info is not None:
+            return get_node_icon(info.icon)
 
         if role == QtCore.Qt.ToolTipRole and column == 0 and info is not None:
             return info.name

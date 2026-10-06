@@ -3,6 +3,7 @@ sdkk main window.
 
 sdkkのメインウィンドウ
 """
+import functools
 import os
 
 from Qt import QtCompat, QtCore, QtWidgets
@@ -18,8 +19,6 @@ RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "resources")
 
 class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
     """The window shell: menu bar, tabs, and status bar. The tabs hold the screens.
-
-    ウィンドウの枠（MenuBar、Tab、StatusBar）
     """
 
     object_name = "SdkkWindow_object"
@@ -50,14 +49,12 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
         self._options = {
             "select_on_click": self.findChild(QtWidgets.QAction, "act_select_on_click"),
-            "load_existing_driven": self.findChild(QtWidgets.QAction, "act_load_existing_driven"),
         }
-        self._page = SetupPage(
-            self._options["select_on_click"],
-            self._options["load_existing_driven"],
-        )
+        self._page = SetupPage(self._options["select_on_click"])
         self.findChild(QtWidgets.QWidget, "tab_setup").layout().addWidget(self._page)
         self._page.statusChanged.connect(self._on_status_changed)
+        self._menu_history = self.findChild(QtWidgets.QMenu, "menu_history")
+        self._menu_history.aboutToShow.connect(self._build_history_menu)
         self._page.emit_status()
 
         with open(os.path.join(RESOURCE_DIR, "style.qss"), encoding="utf-8") as stream:
@@ -90,6 +87,27 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
                 action.setChecked(checked)
 
         self._page.apply_settings(settings)
+
+    def _build_history_menu(self):
+        self._menu_history.clear()
+        entries = self._page.list_history()
+        if not entries:
+            self._menu_history.addAction("(empty)").setEnabled(False)
+
+        for entry in entries:
+            action = self._menu_history.addAction(entry.label)
+            action.triggered.connect(functools.partial(self._on_history_picked, entry))
+
+        self._menu_history.addSeparator()
+        clear = self._menu_history.addAction("Clear History")
+        clear.setEnabled(bool(entries))
+        clear.triggered.connect(self._on_history_cleared)
+
+    def _on_history_picked(self, entry, _checked=False):
+        self._page.restore_history(entry)
+
+    def _on_history_cleared(self, _checked=False):
+        self._page.clear_history()
 
     def _on_status_changed(self, text, warning):
         self._label_context.setText(text)

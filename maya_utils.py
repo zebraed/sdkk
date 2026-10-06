@@ -38,6 +38,24 @@ def undo_chunk(func):
 
 
 @contextlib.contextmanager
+def suspend_undo():
+    """Stop recording undo for the duration of the block, without clearing the undo queue.
+
+    ブロック内だけUndoの記録を止める。Undoキューは消さない
+
+    The previous state is restored afterwards, even if an error occurs.
+
+    終了後は、エラーが起きても元の状態へ戻す
+    """
+    was_enabled = cmds.undoInfo(q=True, st=True)
+    cmds.undoInfo(swf=False)
+    try:
+        yield
+    finally:
+        cmds.undoInfo(swf=was_enabled)
+
+
+@contextlib.contextmanager
 def scene_units(linear=None, angle=None):
     """Temporarily change the scene units for the duration of the block.
 
