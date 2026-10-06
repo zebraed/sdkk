@@ -174,7 +174,7 @@
            <item>
             <widget class="QRadioButton" name="radio_driver_custom">
              <property name="text">
-              <string>Custom</string>
+              <string>Other</string>
              </property>
             </widget>
            </item>
@@ -1317,7 +1317,7 @@
            <item>
             <widget class="QRadioButton" name="radio_driven_custom">
              <property name="text">
-              <string>Custom [0]</string>
+              <string>Other [0]</string>
              </property>
             </widget>
            </item>
@@ -1876,7 +1876,7 @@
           </layout>
          </item>
          <item>
-          <layout class="QHBoxLayout" name="horizontalLayout_key">
+          <layout class="QHBoxLayout" name="horizontalLayout_key" stretch="1,0">
            <property name="leftMargin">
             <number>0</number>
            </property>
@@ -1893,17 +1893,25 @@
             <number>4</number>
            </property>
            <item>
-            <spacer name="spacer_key">
-             <property name="orientation">
-              <enum>Qt::Horizontal</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>20</height>
-              </size>
-             </property>
-            </spacer>
+            <widget class="QWidget" name="holder_driver_presets">
+             <layout class="QHBoxLayout" name="horizontalLayout_driver_presets">
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <property name="spacing">
+               <number>0</number>
+              </property>
+             </layout>
+            </widget>
            </item>
            <item>
             <widget class="QPushButton" name="btn_key">

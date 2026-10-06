@@ -17,6 +17,7 @@ from .node_icons import get_node_icon
 from .widgets.attr_picker import AttrPicker
 from .widgets.collapsible_group import CollapsibleGroup
 from .widgets.pose_strip import PoseStripWidget
+from .widgets.preset_buttons import PresetButtonRow
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "setup_page.ui")
 ATTR_ROLE = QtCore.Qt.UserRole
@@ -90,6 +91,7 @@ class SetupPage(QtWidgets.QWidget):
         return {
             "driver_expanded": self._group_driver.is_expanded,
             "driven_expanded": self._group_driven.is_expanded,
+            "driver_presets": self._presets.values(),
         }
 
     def apply_settings(self, settings):
@@ -107,6 +109,8 @@ class SetupPage(QtWidgets.QWidget):
             expanded = settings.get(key)
             if isinstance(expanded, bool):
                 group.set_expanded(expanded)
+
+        self._presets.restore_values(settings.get("driver_presets"))
 
     def emit_status(self):
         """Emit statusChanged with the current context.
@@ -172,6 +176,9 @@ class SetupPage(QtWidgets.QWidget):
         self._strip.set_context_actions([("delete", "Delete Key")])
         self._find(QtWidgets.QWidget, "holder_pose_strip").layout().addWidget(self._strip)
 
+        self._presets = PresetButtonRow()
+        self._find(QtWidgets.QWidget, "holder_driver_presets").layout().addWidget(self._presets)
+
         self._model = DrivenNodeModel(self)
         self._table.setModel(self._model)
         self._table.verticalHeader().setVisible(False)
@@ -224,6 +231,7 @@ class SetupPage(QtWidgets.QWidget):
         self._strip.scrubFinished.connect(self._on_scrub_finished)
         self._strip.markMoved.connect(self._on_mark_moved)
         self._strip.contextTriggered.connect(self._on_strip_action)
+        self._presets.presetClicked.connect(self._on_preset_clicked)
         self._btn_key.clicked.connect(self._on_key_clicked)
 
     # --- state ---
@@ -450,8 +458,6 @@ class SetupPage(QtWidgets.QWidget):
         return actions
 
     def _add_delete_menu(self, menu, targets):
-        # ドリブンキーがあるアトリビュートだけを並べる
-        # ドライバーが決まっていれば、そのドライバーのドリブンキーがあるものだけ
         snapshot = self._snapshot
         menu.addSeparator()
         submenu = menu.addMenu("Delete DrivenKey")
@@ -483,7 +489,6 @@ class SetupPage(QtWidgets.QWidget):
         except (RuntimeError, ValueError) as exc:
             error = f"⚠ Cannot delete the driven key of {info.short_name}.{attr}: {exc}"
         else:
-            # ドリブンキーがなくなったアトリビュートは、ノードの有効なアトリビュートからも外す
             self._state = self._state.with_driven_attr(uuid, attr, False)
 
         self._refresh()
@@ -563,12 +568,6 @@ class SetupPage(QtWidgets.QWidget):
 
         ドライバーとドリブンの組の履歴を、新しい順に返す
 
-        The history is brought up to date with the scene first, so sets
-        that are gone are dropped, and the driven nodes are the ones
-        driven now.
-
-        先に履歴をシーンの現在の状態に合わせるため、なくなった組は外れ、ドリブンは今動かされているものになる
-
         Returns:
             tuple[HistoryEntry, ...]: 履歴
         """
@@ -583,13 +582,6 @@ class SetupPage(QtWidgets.QWidget):
         """Clear the whole history.
 
         履歴をすべて消す
-
-        The set on the screen is not recorded again until another set is
-        used or a key is set on it, since it would come right back on the
-        next redraw.
-
-        画面にある組は、次の再描画ですぐ戻ってしまうため、別の組を使うか、その組にキーを打つまで
-        履歴に記録しない
         """
         entry = service.build_history_entry(self._state)
         self._cleared_key = None if entry is None else entry.key
@@ -601,10 +593,6 @@ class SetupPage(QtWidgets.QWidget):
         """Set the driver and the driven nodes of a history entry on the screen.
 
         履歴の項目のドライバーとドリブンを、画面に設定する
-
-        Nodes that are not in the scene are left out and reported.
-
-        シーンにないノードは外し、警告する
 
         Args:
             entry (HistoryEntry): 履歴の項目
@@ -620,7 +608,6 @@ class SetupPage(QtWidgets.QWidget):
             self._notify(f"⚠ Not found in the scene: {names}")
 
     def _record_history_if_driven(self):
-        # ドライバーのドリブンキーがすでにある組は、Keyを打たなくても履歴に残す
         driven = self._snapshot.driven_state
         if not any(driven.get(key) == "driver" for key in self._state.list_plug_keys()):
             return
@@ -631,7 +618,6 @@ class SetupPage(QtWidgets.QWidget):
 
         self._cleared_key = None
         history = push_history(self._history, entry)
-        # 再描画のたびに来るため、変わらないときは保存しない
         if history != self._history:
             self._history = history
             service.write_history(history)
@@ -701,6 +687,21 @@ class SetupPage(QtWidgets.QWidget):
             ops.remove_driven_keys_at(snapshot.driver_plug, snapshot.key_plugs, value)
             self._refresh()
 
+    def _on_preset_clicked(self, value):
+        snapshot = self._snapshot
+        if snapshot.driver_plug is None:
+            return
+
+        error = None
+        try:
+            gui_ops.apply_driver_preset(snapshot.driver_plug, value)
+        except RuntimeError as exc:
+            error = f"⚠ Cannot move {snapshot.driver_plug}: {exc}"
+
+        self._refresh()
+        if error is not None:
+            self._notify(error)
+
     def _on_key_clicked(self):
         snapshot = self._snapshot
         if snapshot.driver_plug is None or not snapshot.key_plugs:
@@ -713,8 +714,6 @@ class SetupPage(QtWidgets.QWidget):
             error = f"⚠ Key failed: {exc}"
         else:
             self._cleared_key = None
-
-        # 再描画がStatusBarを書き換えるため、エラーは再描画のあとに出す
         self._refresh()
         if error is not None:
             self._notify(error)
@@ -797,7 +796,7 @@ class SetupPage(QtWidgets.QWidget):
         self._radio_driven_transform.setText(
             f"Transform [{0 if node is None else len(node.transform)}]"
         )
-        self._radio_driven_custom.setText(f"Custom [{0 if node is None else len(node.custom)}]")
+        self._radio_driven_custom.setText(f"Other [{0 if node is None else len(node.custom)}]")
 
         for attr, button in self._driven_cells.items():
             self._render_cell(button, attr, node)
@@ -851,6 +850,7 @@ class SetupPage(QtWidgets.QWidget):
         self._label_key_status.setText(status.describe(summary.keyed, summary.total))
         self._btn_key.setText(status.button_text)
         self._btn_key.setEnabled(snapshot.driver_plug is not None and bool(snapshot.key_plugs))
+        self._presets.setEnabled(snapshot.driver_plug is not None)
 
     def _build_status(self):
         snapshot = self._snapshot
@@ -896,7 +896,6 @@ def _set_node_icon(label, info):
 
 
 def _show_page(stack, index):
-    # QStackedWidgetは最大のページに合わせた高さを確保するため、表示中以外は大きさの計算から外す
     stack.setCurrentIndex(index)
     for each in range(stack.count()):
         policy = QtWidgets.QSizePolicy.Preferred if each == index else QtWidgets.QSizePolicy.Ignored

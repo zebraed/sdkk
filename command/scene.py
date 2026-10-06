@@ -8,13 +8,16 @@ import os
 from maya import cmds
 
 from ..core.model import Plug
+from ..core.setup_state import is_transform_attr
 from ..core.state import Side, Status
 from . import drivenkey
 
 
-NUMERIC_TYPES = frozenset({
+# boolとenumは整数として扱えるため、数値と同じく候補にする（visibilityなど）
+CANDIDATE_TYPES = frozenset({
     "double", "float", "long", "short", "byte",
     "doubleLinear", "doubleAngle", "floatLinear", "floatAngle", "time",
+    "bool", "enum",
 })
 
 
@@ -137,34 +140,48 @@ def find_node(uuid):
 
 
 def list_candidate_attrs(node, for_driven):
-    """List the custom attributes that can be used as a driver or a driven.
+    """List the keyable attributes other than translate / rotate / scale that can be used as a driver or a driven.
 
-    ドライバーまたはドリブンに使えるカスタムアトリビュートを列挙する
+    TRSとXYZ以外のKeyableなアトリビュートのうち、ドライバーまたはドリブンに使えるものを列挙する
 
-    A candidate is user defined, keyable, and numeric. A driven must
-    also not be locked.
+    A candidate is keyable and numeric (bool and enum included). A driven must
+    also not be locked. User defined attributes come first, then the others in the
+    order Maya lists them. Translate / rotate / scale are left out, since the GUI
+    handles them with its own grid. The elements of a multi attribute are listed by
+    their alias, such as the target weights of a blendShape.
 
-    候補はUser Defined・Keyable・数値型のもの。ドリブンはロックされていないことも条件にする
+    候補はKeyableな数値型（boolとenumを含む）のもの。ドリブンはロックされていないことも条件にする
+    User Definedを先に並べ、続けてそれ以外をMayaが返す順に並べる
+    TRSとXYZは、GUIが専用の表で扱うため候補にしない
+    multiアトリビュートの要素は、別名で列挙する（blendShapeのターゲットウェイトなど）
 
     Args:
         node (str): ノード名
         for_driven (bool): ドリブン用か。Falseはドライバー用
 
     Returns:
-        list[str]: アトリビュートのロングネーム
+        list[str]: アトリビュート名。別名のあるものは別名（blendShapeのターゲット名など）
     """
-    names = cmds.listAttr(node, ud=True, k=True)
-    if names is None:
+    # multiを指定すると、multiアトリビュートの親ではなく、別名のついた要素が返る
+    keyable = cmds.listAttr(node, k=True, m=True)
+    if keyable is None:
         return []
 
+    user_defined = cmds.listAttr(node, ud=True, k=True, m=True)
+    if user_defined is None:
+        user_defined = []
+
     candidates = []
-    for name in names:
+    for name in user_defined + [name for name in keyable if name not in user_defined]:
         # 複合アトリビュートの子は対象にしない
         if "." in name:
             continue
 
+        if is_transform_attr(name):
+            continue
+
         plug = f"{node}.{name}"
-        if cmds.getAttr(plug, typ=True) not in NUMERIC_TYPES:
+        if cmds.getAttr(plug, typ=True) not in CANDIDATE_TYPES:
             continue
 
         if for_driven and cmds.getAttr(plug, l=True):

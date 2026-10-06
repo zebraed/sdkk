@@ -275,26 +275,6 @@ def remove_key(driver, driven, driver_value):
 
 
 @undo_chunk
-def set_driver_value(driver, value):
-    """Move the driver to a value, such as the driver value of a key.
-
-    ドライバーを指定の値へ動かす（キーのドライバー値へ移動するときなど）
-
-    Args:
-        driver (str): ドライバーアトリビュート
-        value (float): 設定する値
-
-    Raises:
-        RuntimeError: ロックされている、または入力があって設定できない場合
-
-    Examples:
-        >>> import sdkk
-        >>> sdkk.set_driver_value("jaw_ctl.rotateX", 30.0)
-    """
-    cmds.setAttr(driver, value)
-
-
-@undo_chunk
 def move_driven_keys(driver, driven_plugs, driver_value, new_value):
     """Move the keys at a driver value to another driver value, as one undo step.
 

@@ -50,14 +50,12 @@ if TYPE_CHECKING:
         retarget_driven_keys,
         set_driven_key,
         set_driven_keys,
-        set_driver_value,
     )
     from .ui import show  # noqa: F401
 
 _EXPORTS = {
     "set_driven_key": "ops",
     "set_driven_keys": "ops",
-    "set_driver_value": "ops",
     "show": "ui",
     "convert_animation_to_driven_keys": "ops",
     "remove_key": "ops",

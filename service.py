@@ -209,9 +209,9 @@ def get_selected_nodes():
 
 
 def list_candidate_attrs(uuid, for_driven):
-    """List the custom attributes of a node that can be used as a driver or a driven.
+    """List the keyable attributes of a node, except translate / rotate / scale, usable as a driver or a driven.
 
-    ノードのカスタムアトリビュートのうち、ドライバーまたはドリブンに使えるものを列挙する
+    ノードのTRSとXYZ以外のKeyableなアトリビュートのうち、ドライバーまたはドリブンに使えるものを列挙する
 
     Args:
         uuid (str): ノードのUUID
