@@ -13,7 +13,6 @@ from ..core.state import Side, Status
 from . import drivenkey
 
 
-# boolとenumは整数として扱えるため、数値と同じく候補にする（visibilityなど）
 CANDIDATE_TYPES = frozenset({
     "double", "float", "long", "short", "byte",
     "doubleLinear", "doubleAngle", "floatLinear", "floatAngle", "time",
@@ -21,8 +20,6 @@ CANDIDATE_TYPES = frozenset({
 })
 
 
-# アウトライナーのアイコンのファイル名の一覧と、ノードタイプごとの探索結果
-# 探索はMayaへの問い合わせを伴うため、1度だけ行って使い回す
 _icon_cache = {"files": None, "types": {}}
 
 
@@ -45,7 +42,7 @@ def find_node_icon(node):
         Optional[str]: リソース名（":/out_joint.png"など）。見つからなければNone
     """
     node_type = cmds.nodeType(node)
-    if cmds.objectType(node, isAType="transform"):
+    if cmds.objectType(node, isa="transform"):
         shapes = cmds.listRelatives(node, s=True, ni=True)
         if shapes is not None:
             node_type = cmds.nodeType(shapes[0])
@@ -61,13 +58,16 @@ def _search_icon(node_type):
     files = _icon_cache["files"]
     if files is None:
         names = cmds.resourceManager(nf="out_*")
-        names = [] if names is None else names
-        # 拡張子はMayaのバージョンで変わるため、外した名前から引く
+        if names is None:
+            names = []
+
         files = {os.path.splitext(name)[0]: name for name in names}
         _icon_cache["files"] = files
 
-    chain = cmds.nodeType(node_type, isTypeName=True, inherited=True)
-    chain = [node_type] if chain is None else chain
+    chain = cmds.nodeType(node_type, itn=True, i=True)
+    if chain is None:
+        chain = [node_type]
+
     for each in reversed(chain):
         name = files.get(f"out_{each}")
         if name is not None:
@@ -91,18 +91,6 @@ def list_selected_nodes():
     return list(dict.fromkeys(selected))
 
 
-def get_node_uuid(node):
-    """Return the UUID of a node.
-
-    Args:
-        node (str): ノード名
-
-    Returns:
-        str: ノードのUUID
-    """
-    return cmds.ls(node, uuid=True)[0]
-
-
 def find_uuid(name):
     """Find the UUID of the node with the name.
 
@@ -114,7 +102,7 @@ def find_uuid(name):
     Returns:
         Optional[str]: ノードのUUID。存在しない、または同じ名前のノードが複数ある場合はNone
     """
-    found = cmds.ls(name, uuid=True)
+    found = cmds.ls(name, uid=True)
     if found is None or len(found) != 1:
         return None
 
@@ -144,17 +132,6 @@ def list_candidate_attrs(node, for_driven):
 
     TRSとXYZ以外のKeyableなアトリビュートのうち、ドライバーまたはドリブンに使えるものを列挙する
 
-    A candidate is keyable and numeric (bool and enum included). A driven must
-    also not be locked. User defined attributes come first, then the others in the
-    order Maya lists them. Translate / rotate / scale are left out, since the GUI
-    handles them with its own grid. The elements of a multi attribute are listed by
-    their alias, such as the target weights of a blendShape.
-
-    候補はKeyableな数値型（boolとenumを含む）のもの。ドリブンはロックされていないことも条件にする
-    User Definedを先に並べ、続けてそれ以外をMayaが返す順に並べる
-    TRSとXYZは、GUIが専用の表で扱うため候補にしない
-    multiアトリビュートの要素は、別名で列挙する（blendShapeのターゲットウェイトなど）
-
     Args:
         node (str): ノード名
         for_driven (bool): ドリブン用か。Falseはドライバー用
@@ -162,7 +139,7 @@ def list_candidate_attrs(node, for_driven):
     Returns:
         list[str]: アトリビュート名。別名のあるものは別名（blendShapeのターゲット名など）
     """
-    # multiを指定すると、multiアトリビュートの親ではなく、別名のついた要素が返る
+    # multiを指定すると別名のついた要素が返る
     keyable = cmds.listAttr(node, k=True, m=True)
     if keyable is None:
         return []
@@ -171,8 +148,13 @@ def list_candidate_attrs(node, for_driven):
     if user_defined is None:
         user_defined = []
 
+    names = list(user_defined)
+    for name in keyable:
+        if name not in user_defined:
+            names.append(name)
+
     candidates = []
-    for name in user_defined + [name for name in keyable if name not in user_defined]:
+    for name in names:
         # 複合アトリビュートの子は対象にしない
         if "." in name:
             continue
@@ -195,6 +177,8 @@ def list_candidate_attrs(node, for_driven):
 def read_value(plug):
     """Read the current value of an attribute.
 
+    アトリビュートの現在値を読む
+
     Args:
         plug (str): アトリビュート
 
@@ -205,18 +189,6 @@ def read_value(plug):
         return None
 
     return cmds.getAttr(plug)
-
-
-def is_locked(plug):
-    """Return whether the attribute is locked.
-
-    Args:
-        plug (str): 存在するアトリビュート
-
-    Returns:
-        bool: ロックされている場合はTrue
-    """
-    return cmds.getAttr(plug, l=True)
 
 
 def has_driven_key_input(plug):
@@ -262,16 +234,28 @@ def list_driver_attrs(node):
 
     ノードのアトリビュートのうち、すでにドリブンキーを動かしているものを列挙する
 
+    Used to match the driver attribute to the one that already drives driven keys, when a
+    node is set as the driver.
+
+    ノードをドライバーに設定するとき、ドライバーのアトリビュートを、すでにドリブンキーを
+    動かしているものに合わせるために使う
+
     Args:
         node (str): ノード名
 
     Returns:
         list[str]: アトリビュートのロングネーム。重複しない
     """
-    keys = drivenkey.list_driven_keys([node], Side.DRIVER)
-    return list(dict.fromkeys(
-        Plug.parse(key.driver).attr for key in keys if key.driver is not None
-    ))
+    attrs = []
+    for key in drivenkey.list_driven_keys([node], Side.DRIVER):
+        if key.driver is None:
+            continue
+
+        attr = Plug.parse(key.driver).attr
+        if attr not in attrs:
+            attrs.append(attr)
+
+    return attrs
 
 
 def list_driven_curves(driven, driver=None):
@@ -288,10 +272,14 @@ def list_driven_curves(driven, driver=None):
         list[str]: animCurveノード名
     """
     if driver is None:
-        return [key.curve for key in drivenkey.list_driven_keys([driven], Side.DRIVEN)]
+        keys = drivenkey.list_driven_keys([driven], Side.DRIVEN)
+        return [key.curve for key in keys]
 
     key = drivenkey.find_driven_key(driver, driven)
-    return [] if key is None else [key.curve]
+    if key is None:
+        return []
+
+    return [key.curve]
 
 
 def list_driven_curve_info(driven):
@@ -306,13 +294,15 @@ def list_driven_curve_info(driven):
         list[tuple[str, list[str]]]: （animCurveノード名, 経由するblendWeightedのノード名）
             blendWeightedは内側から外側の順。直結ならblendWeightedは空
     """
-    return [
-        (
-            key.curve,
-            [] if key.route is None else [level.name for level in key.route.get_blend_data()],
-        )
-        for key in drivenkey.list_driven_keys([driven], Side.DRIVEN)
-    ]
+    info = []
+    for key in drivenkey.list_driven_keys([driven], Side.DRIVEN):
+        blend_names = []
+        if key.route is not None:
+            blend_names = [level.name for level in key.route.get_blend_data()]
+
+        info.append((key.curve, blend_names))
+
+    return info
 
 
 def list_driven_plugs(driver):
@@ -320,24 +310,24 @@ def list_driven_plugs(driver):
 
     ドライバーがすでに動かしているドリブンアトリビュートを列挙する
 
+    Used to add the driven attributes that a driver already drives to the driven list,
+    when the driver is set.
+
+    ドライバーを設定するとき、そのドライバーがすでに動かしているドリブンアトリビュートを、
+    ドリブンの一覧へ加えるために使う
+
     Args:
         driver (str): ドライバーアトリビュート
 
     Returns:
         list[str]: ドリブンアトリビュート。読み取れないドリブンキーは含まない
     """
-    keys = drivenkey.list_driven_keys([driver], Side.DRIVER)
-    return list(dict.fromkeys(
-        key.driven for key in keys if key.status is Status.OK
-    ))
+    plugs = []
+    for key in drivenkey.list_driven_keys([driver], Side.DRIVER):
+        if key.status is not Status.OK:
+            continue
 
+        if key.driven not in plugs:
+            plugs.append(key.driven)
 
-def select_nodes(nodes):
-    """Replace the selection with the nodes.
-
-    選択をノードに置き換える
-
-    Args:
-        nodes (Sequence[str]): ノード名
-    """
-    cmds.select(nodes, r=True)
+    return plugs

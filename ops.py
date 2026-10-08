@@ -1019,13 +1019,11 @@ def _read_driven_keys(nodes, side):
     keys = list_driven_keys(nodes, side)
     unreadable = [key for key in keys if key.status is not Status.OK]
     if unreadable:
+        descriptions = [f"{key.curve} ({key.status.value})" for key in unreadable]
         logger.warning(
             "Skipped %d driven keys that cannot be read: %s",
             len(unreadable),
-            ", ".join(
-                f"{key.curve} ({key.status.value})"
-                for key in unreadable
-            ),
+            ", ".join(descriptions),
         )
 
     return [key.read() for key in keys if key.status is Status.OK]

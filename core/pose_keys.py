@@ -134,11 +134,12 @@ def summarize_pose_keys(plug_keys, driver_value, tolerance=DEFAULT_TOLERANCE, fo
         PoseSummary: 集計結果
     """
     focused_keys = set(plug_keys) if focus is None else set(focus) & set(plug_keys)
-    points = sorted(
-        (value, key)
-        for key, values in plug_keys.items()
-        for value in values
-    )
+    points = []
+    for key, values in plug_keys.items():
+        for value in values:
+            points.append((value, key))
+
+    points.sort()
 
     clusters = []
     for value, key in points:
@@ -155,13 +156,11 @@ def summarize_pose_keys(plug_keys, driver_value, tolerance=DEFAULT_TOLERANCE, fo
         else:
             marks.append(PoseMark(value, len(keys), len(plug_keys), focused=False))
 
-    if driver_value is None:
-        keyed = 0
-    else:
-        keyed = sum(
-            any(math.isclose(v, driver_value, abs_tol=tolerance) for v in plug_keys[key])
-            for key in focused_keys
-        )
+    keyed = 0
+    if driver_value is not None:
+        for key in focused_keys:
+            if any(math.isclose(value, driver_value, abs_tol=tolerance) for value in plug_keys[key]):
+                keyed += 1
 
     return PoseSummary(tuple(marks), keyed, len(focused_keys))
 

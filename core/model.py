@@ -547,7 +547,8 @@ class SwapMapper:
 
         self._table = table
         sources = sorted(table, key=len, reverse=True)
-        self._pattern = re.compile("|".join(re.escape(source) for source in sources))
+        escaped = [re.escape(source) for source in sources]
+        self._pattern = re.compile("|".join(escaped))
 
     def __call__(self, name):
         return self._pattern.sub(lambda match: self._table[match.group(0)], name)
@@ -764,7 +765,10 @@ def _resolve_driver_direction(driver_values, key_positions):
 
         direction = step
 
-    return 1.0 if direction is None else direction
+    if direction is None:
+        return 1.0
+
+    return direction
 
 
 def _join_node_name(parts):

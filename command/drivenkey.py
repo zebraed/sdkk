@@ -180,7 +180,10 @@ class DrivenKey:
 
         ドリブンアトリビュート。経路を解決できなければNone
         """
-        return None if self.route is None else self.route.driven
+        if self.route is None:
+            return None
+
+        return self.route.driven
 
     def read(self):
         """Read this driven key as a DrivenKeyData.
@@ -528,7 +531,6 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
     skipped = []
     failed = []
     warnings = []
-    # 名前の衝突でMayaが別名を付けたノードも同じ段として見つけられるよう、作ったノードを覚えておく
     blend_nodes = {}
     with maya_utils.scene_units(linear_unit, angle_unit):
         for item in items:
@@ -539,7 +541,7 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
             try:
                 curve, item_warnings = _apply_item(item, blend_nodes)
             except RuntimeError as exc:
-                # Mayaのエラー文は末尾に改行が付くため取り除く
+                # 末尾に改行が付くため取り除く
                 failed.append((item, str(exc).strip()))
                 continue
 
@@ -685,7 +687,8 @@ def build_retarget_pairs(sources, drivens, rows):
                 f"{len(target_drivens)} != {len(source_nodes)}"
             )
 
-        for node in [target_driver] + target_drivens:
+        nodes = [target_driver] + target_drivens
+        for node in nodes:
             if "." in node:
                 raise ValueError(
                     f"Row {index}: expected a node name, not an attribute: "
@@ -1057,7 +1060,10 @@ def _rename_inserted_blend(key, driven, input_before):
 
 def _get_input_node(plug):
     sources = cmds.listConnections(plug, s=True, d=False, scn=True)
-    return None if sources is None else sources[0]
+    if sources is None:
+        return None
+
+    return sources[0]
 
 
 def _set_attr_value(plug, value):

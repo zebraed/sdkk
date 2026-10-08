@@ -75,10 +75,16 @@ class DrivenNodeModel(QtCore.QAbstractTableModel):
         return None
 
     def rowCount(self, parent=QtCore.QModelIndex()):
-        return 0 if parent.isValid() else len(self._nodes)
+        if parent.isValid():
+            return 0
+
+        return len(self._nodes)
 
     def columnCount(self, parent=QtCore.QModelIndex()):
-        return 0 if parent.isValid() else len(COLUMNS)
+        if parent.isValid():
+            return 0
+
+        return len(COLUMNS)
 
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
@@ -95,7 +101,10 @@ class DrivenNodeModel(QtCore.QAbstractTableModel):
         column = index.column()
         if role == QtCore.Qt.DisplayRole:
             if column == 0:
-                return "(missing node)" if info is None else info.short_name
+                if info is None:
+                    return "(missing node)"
+
+                return info.short_name
 
             return node.attr_summary or "-"
 

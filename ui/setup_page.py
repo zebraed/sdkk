@@ -207,7 +207,7 @@ class SetupPage(QtWidgets.QWidget):
     def _connect_signals(self):
         self._btn_set_selected.clicked.connect(self._on_set_selected)
         self._radio_driver_transform.toggled.connect(self._on_driver_mode_toggled)
-        self._picker_driver.attrPicked.connect(self._on_driver_attr_picked)
+        self._picker_driver.attrPicked.connect(self._choose_driver_attr)
         for attr, radio in self._driver_radios.items():
             radio.toggled.connect(functools.partial(self._on_driver_radio_toggled, attr))
 
@@ -243,7 +243,10 @@ class SetupPage(QtWidgets.QWidget):
         if self._state.get_driven(self._current_uuid) is not None:
             return self._current_uuid
 
-        return self._state.driven[0].uuid if self._state.driven else None
+        if not self._state.driven:
+            return None
+
+        return self._state.driven[0].uuid
 
     def _resolve_target_uuids(self):
         # キーを打つ対象は、一覧で選択しているノード。選択がなければ詳細を表示しているノード
@@ -357,9 +360,6 @@ class SetupPage(QtWidgets.QWidget):
 
         self._choose_driver_attr(attr)
 
-    def _on_driver_attr_picked(self, attr):
-        self._choose_driver_attr(attr)
-
     def _choose_driver_attr(self, attr):
         driver = self._state.driver
         if driver is None:
@@ -387,7 +387,8 @@ class SetupPage(QtWidgets.QWidget):
         if added:
             self._current_uuid = added[0]
 
-        self._set_state(self._state.add_nodes(n.uuid for n in nodes))
+        uuids = [node.uuid for node in nodes]
+        self._set_state(self._state.add_nodes(uuids))
 
     def _selected_uuids(self):
         rows = sorted({index.row() for index in self._table.selectionModel().selectedRows()})
@@ -411,9 +412,14 @@ class SetupPage(QtWidgets.QWidget):
             return
 
         nodes = [self._state.get_driven(uuid) for uuid in self._selected_uuids()]
+        targets = []
+        for node in nodes:
+            for attr in node.attrs:
+                targets.append((node.uuid, attr))
+
         self._exec_item_menu(
             self._table.viewport().mapToGlobal(pos),
-            [(n.uuid, a) for n in nodes for a in n.attrs],
+            targets,
             self._remove_selected_nodes,
         )
 
@@ -736,7 +742,10 @@ class SetupPage(QtWidgets.QWidget):
             return None
 
         info = self._snapshot.nodes.get(driver.uuid)
-        return "(missing node)" if info is None else info.short_name
+        if info is None:
+            return "(missing node)"
+
+        return info.short_name
 
     def _render_driver(self):
         snapshot = self._snapshot
@@ -830,7 +839,8 @@ class SetupPage(QtWidgets.QWidget):
         state = self._snapshot.driven_state.get(key, "none")
         _set_property(button, "driven", state)
         tips = [attr, _DRIVEN_TIPS.get(state), reason]
-        button.setToolTip(": ".join(tip for tip in tips if tip is not None))
+        shown_tips = [tip for tip in tips if tip is not None]
+        button.setToolTip(": ".join(shown_tips))
         _set_property(button, "blocked", reason is not None)
 
     def _select_current_row(self):
@@ -880,11 +890,17 @@ class SetupPage(QtWidgets.QWidget):
 
 
 def _format(value, digits):
-    return "-" if value is None else f"{value:.{digits}f}"
+    if value is None:
+        return "-"
+
+    return f"{value:.{digits}f}"
 
 
 def _plural(count, word):
-    return word if count == 1 else f"{word}s"
+    if count == 1:
+        return word
+
+    return f"{word}s"
 
 
 def _set_node_icon(label, info):

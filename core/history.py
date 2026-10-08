@@ -38,11 +38,11 @@ class HistoryEntry:
     driven: tuple
 
     def __post_init__(self):
-        object.__setattr__(
-            self,
-            "driven",
-            tuple((node, tuple(attrs)) for node, attrs in self.driven),
-        )
+        driven = []
+        for node, attrs in self.driven:
+            driven.append((node, tuple(attrs)))
+
+        object.__setattr__(self, "driven", tuple(driven))
 
     @property
     def key(self):
@@ -69,7 +69,10 @@ class HistoryEntry:
             return driver
 
         text = f"{driver} -> {_short_name(self.driven[0][0])}"
-        return text + " ..." if len(self.driven) > 1 else text
+        if len(self.driven) > 1:
+            text += " ..."
+
+        return text
 
     def to_dict(self):
         """Convert to a dict that can be written as JSON.

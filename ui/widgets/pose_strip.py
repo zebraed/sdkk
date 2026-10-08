@@ -129,18 +129,16 @@ class PoseStripWidget(QtWidgets.QWidget):
 
     def _start_drag(self, event, mark):
         index = self._marks.index(mark)
-        # 動かし方の目安になる隣のマーカーが必要
         if not mark.focused or len(self._marks) < 2:
             return
 
         values, _, xs = self._layout_marks()
+        # MEMO
         # 1ピクセルあたりの値の変化。ストリップ全体の傾きで決める
         # 隣と近いマーカーの間の傾きでは、ほとんど動かせなくなるため
         # 端のキーは、外側へも同じ傾きで伸ばす
         slope = (values[-1] - values[0]) / (xs[-1] - xs[0])
 
-        # 動かせる範囲を決めるのは、同じ注目しているキーを持つ隣のマーカーだけ
-        # 注目していないマーカーは、跨いだり同じ位置に重ねたりできる
         marks = self._marks
         lower = max((i for i in range(index) if marks[i].focused), default=None)
         upper = min((i for i in range(index + 1, len(marks)) if marks[i].focused), default=None)
@@ -180,7 +178,6 @@ class PoseStripWidget(QtWidgets.QWidget):
         if drag["step"]:
             return
 
-        # 注目していないマーカーの近くでは、その値へ吸い付けて同じ位置にそろえやすくする
         for x, value in drag["snaps"]:
             if abs(drag["x0"] + dx - x) <= self._SNAP_PX:
                 drag["raw"] = value
@@ -199,7 +196,10 @@ class PoseStripWidget(QtWidgets.QWidget):
             digits=9 if drag["snapped"] else 3,
             step=self._DRAG_STEP if drag["step"] else None,
         )
-        return drag["value"] if value is None else value
+        if value is None:
+            return drag["value"]
+
+        return value
 
     def _get_scrub_value(self, event):
         values, fractions, xs = self._layout_marks()
@@ -285,7 +285,6 @@ class PoseStripWidget(QtWidgets.QWidget):
             return
 
         if event.button() == QtCore.Qt.MiddleButton and self._drag is not None:
-            # 動かさずにShiftを押し離しした場合も反映する
             self._update_drag(event)
             old = self._drag["value"]
             new = self._get_dragged_value()
@@ -301,7 +300,6 @@ class PoseStripWidget(QtWidgets.QWidget):
 
     def contextMenuEvent(self, event):
         mark = self._find_mark_at(event.pos())
-        # 注目していないキーは、削除などの対象にしない
         if mark is None or not mark.focused or not self._actions:
             return
 

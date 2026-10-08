@@ -130,7 +130,7 @@ class PresetButton(QtWidgets.QPushButton):
         editor.setAlignment(QtCore.Qt.AlignCenter)
         editor.setGeometry(self.rect())
         editor.editingFinished.connect(self._commit_edit)
-        editor.cancelled.connect(self._cancel_edit)
+        editor.cancelled.connect(self._finish_edit)
         self._editor = editor
         QtWidgets.QApplication.instance().installEventFilter(self)
         editor.show()
@@ -151,9 +151,6 @@ class PresetButton(QtWidgets.QPushButton):
         if math.isfinite(value) and value != self._value:
             self.set_value(value)
             self.valueChanged.emit(value)
-
-    def _cancel_edit(self):
-        self._finish_edit()
 
     def _finish_edit(self):
         editor = self._editor

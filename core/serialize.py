@@ -195,8 +195,10 @@ def _convert_key_to_dict(key):
 def _convert_dict_to_driven_key(item):
     blend = tuple(_convert_dict_to_blend_level(level) for level in _get_field(item, "blend", (list,)))
     curve_item = _get_field(item, "curve", (dict,))
+    key_items = _get_field(curve_item, "keys", (list,))
+    keys = tuple(_convert_dict_to_key(key) for key in key_items)
     curve = CurveData(
-        keys=tuple(_convert_dict_to_key(key) for key in _get_field(curve_item, "keys", (list,))),
+        keys=keys,
         pre_infinity=_get_str(curve_item, "pre_infinity"),
         post_infinity=_get_str(curve_item, "post_infinity"),
         weighted=_get_bool(curve_item, "weighted"),

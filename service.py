@@ -48,7 +48,7 @@ class NodeInfo:
             NodeInfo: 作成した結果
         """
         return cls(
-            scene.get_node_uuid(name),
+            cmds.ls(name, uid=True)[0],
             name,
             name.rpartition("|")[2],
             scene.find_node_icon(name),
@@ -166,7 +166,7 @@ def read_snapshot(state, detail_uuid=None, target_uuids=()):
         values[key] = scene.read_value(plug)
         if values[key] is None:
             blocked[key] = f"{info.short_name}.{attr} not found"
-        elif scene.is_locked(plug):
+        elif cmds.getAttr(plug, l=True):
             blocked[key] = f"{info.short_name}.{attr} is locked"
         elif drivenkey.has_foreign_input(plug):
             blocked[key] = f"{info.short_name}.{attr} has an incoming connection"
@@ -185,6 +185,11 @@ def read_snapshot(state, detail_uuid=None, target_uuids=()):
         driven_state[key] = "driver" if plug_values[key] else "other"
 
     plug_keys = {plug: plug_values.get(key, ()) for key, plug in enabled_plugs.items()}
+    warnings = []
+    for key in dict.fromkeys(enabled):
+        if key in blocked:
+            warnings.append(blocked[key])
+
     return SetupSnapshot(
         nodes=nodes,
         driver_plug=driver_plug,
@@ -193,7 +198,7 @@ def read_snapshot(state, detail_uuid=None, target_uuids=()):
         blocked=blocked,
         key_plugs=tuple(key_plugs.values()),
         summary=summarize_pose_keys(plug_keys, driver_value, focus=key_plugs.values()),
-        warnings=tuple(blocked[key] for key in dict.fromkeys(enabled) if key in blocked),
+        warnings=tuple(warnings),
         driven_state=driven_state,
         driver_attrs=driver_attrs,
     )
@@ -270,7 +275,7 @@ def list_driven_of(driver):
     pairs = []
     for text in scene.list_driven_plugs(f"{name}.{driver.attr}"):
         plug = Plug.parse(text)
-        pairs.append((scene.get_node_uuid(plug.node), plug.attr))
+        pairs.append((cmds.ls(plug.node, uid=True)[0], plug.attr))
 
     return pairs
 
@@ -315,7 +320,7 @@ def select_scene_nodes(names):
     Args:
         names (Sequence[str]): ノード名
     """
-    scene.select_nodes(names)
+    cmds.select(names, r=True)
 
 
 def select_node(uuid):
@@ -326,7 +331,7 @@ def select_node(uuid):
     """
     name = scene.find_node(uuid)
     if name is not None:
-        scene.select_nodes([name])
+        cmds.select(name, r=True)
 
 
 def read_settings():
@@ -338,7 +343,10 @@ def read_settings():
         dict: 設定。保存がない、または読めない場合は空
     """
     settings = _read_option(SETTINGS_KEY)
-    return settings if isinstance(settings, dict) else {}
+    if not isinstance(settings, dict):
+        return {}
+
+    return settings
 
 
 def write_settings(settings):
@@ -361,7 +369,10 @@ def read_history():
         tuple[HistoryEntry, ...]: 新しい順の履歴。保存がない、または読めない場合は空
     """
     items = _read_option(HISTORY_KEY)
-    return parse_history(items) if isinstance(items, list) else ()
+    if not isinstance(items, list):
+        return ()
+
+    return parse_history(items)
 
 
 def write_history(entries):

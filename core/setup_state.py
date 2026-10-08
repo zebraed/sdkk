@@ -9,8 +9,10 @@ from dataclasses import dataclass, replace
 TRANSFORM_KINDS = (("translate", "T"), ("rotate", "R"), ("scale", "S"))
 AXES = ("X", "Y", "Z")
 
-TRANSFORM_ATTRS = tuple(
-    f"{kind}{axis}" for kind, _ in TRANSFORM_KINDS for axis in AXES
+TRANSFORM_ATTRS = (
+    "translateX", "translateY", "translateZ",
+    "rotateX", "rotateY", "rotateZ",
+    "scaleX", "scaleY", "scaleZ",
 )
 
 
@@ -248,10 +250,8 @@ class SetupState:
             SetupState: 更新した結果
         """
         removed = set(uuids)
-        return replace(
-            self,
-            driven=tuple(n for n in self.driven if n.uuid not in removed),
-        )
+        driven = tuple(node for node in self.driven if node.uuid not in removed)
+        return replace(self, driven=driven)
 
     def with_driven_attr(self, uuid, attr, enabled):
         """Return a state with an attribute of a driven node enabled or disabled.
@@ -266,13 +266,14 @@ class SetupState:
         Returns:
             SetupState: 更新した結果。uuidのノードがなければそのまま
         """
-        return replace(
-            self,
-            driven=tuple(
-                node.with_attr(attr, enabled) if node.uuid == uuid else node
-                for node in self.driven
-            ),
-        )
+        driven = []
+        for node in self.driven:
+            if node.uuid == uuid:
+                driven.append(node.with_attr(attr, enabled))
+            else:
+                driven.append(node)
+
+        return replace(self, driven=tuple(driven))
 
     def list_plug_keys(self):
         """List the enabled driven attributes as (uuid, attr) pairs.
@@ -282,4 +283,9 @@ class SetupState:
         Returns:
             list[tuple[str, str]]: ノードの順に、各ノードのアトリビュート順
         """
-        return [(node.uuid, attr) for node in self.driven for attr in node.attrs]
+        plug_keys = []
+        for node in self.driven:
+            for attr in node.attrs:
+                plug_keys.append((node.uuid, attr))
+
+        return plug_keys
