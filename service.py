@@ -123,7 +123,8 @@ def read_snapshot(state, detail_uuid=None, target_uuids=()):
     if detail_uuid is not None:
         inspected += [(detail_uuid, attr) for attr in TRANSFORM_ATTRS]
 
-    uuids = [uuid for uuid, _ in inspected]
+    uuids = [node.uuid for node in state.driven]
+    uuids += [uuid for uuid, _ in inspected]
     if state.driver is not None:
         uuids.append(state.driver.uuid)
 
