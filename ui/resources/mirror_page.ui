@@ -1,0 +1,651 @@
+<?xml version='1.0' encoding='utf-8'?>
+<ui version="4.0">
+ <class>MirrorPage</class>
+ <widget class="QWidget" name="MirrorPage">
+  <layout class="QVBoxLayout" name="verticalLayout_page">
+   <property name="leftMargin">
+    <number>6</number>
+   </property>
+   <property name="topMargin">
+    <number>6</number>
+   </property>
+   <property name="rightMargin">
+    <number>6</number>
+   </property>
+   <property name="bottomMargin">
+    <number>6</number>
+   </property>
+   <property name="spacing">
+    <number>6</number>
+   </property>
+   <item>
+    <widget class="QWidget" name="holder_rule">
+     <layout class="QVBoxLayout" name="verticalLayout_rule">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>4</number>
+      </property>
+      <item>
+       <widget class="QFrame" name="widget_rule_body">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_rule_body">
+         <property name="leftMargin">
+          <number>8</number>
+         </property>
+         <property name="topMargin">
+          <number>6</number>
+         </property>
+         <property name="rightMargin">
+          <number>8</number>
+         </property>
+         <property name="bottomMargin">
+          <number>6</number>
+         </property>
+         <property name="spacing">
+          <number>6</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_names">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_search">
+             <property name="text">
+              <string>Search</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="edit_search">
+             <property name="text">
+              <string>_L</string>
+             </property>
+             <property name="toolTip">
+              <string>Text in the node names to replace. Only the keys whose names contain it are listed</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_swap">
+             <property name="text">
+              <string>⇄</string>
+             </property>
+             <property name="toolTip">
+              <string>Swap Search and Replace</string>
+             </property>
+             <property name="maximumSize">
+              <size><width>28</width><height>16777215</height></size>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_replace">
+             <property name="text">
+              <string>Replace</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLineEdit" name="edit_replace">
+             <property name="text">
+              <string>_R</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_regex">
+             <property name="text">
+              <string>Regex</string>
+             </property>
+             <property name="toolTip">
+              <string>Use Search as a regular expression and Replace as its replacement</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_invert_driven">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_invert_driven">
+             <property name="text">
+              <string>Invert Value</string>
+             </property>
+             <property name="toolTip">
+              <string>The default of the Inv Value column: the driven attributes whose values are negated</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_translateX">
+             <property name="text">
+              <string>TX</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_translateY">
+             <property name="text">
+              <string>TY</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_translateZ">
+             <property name="text">
+              <string>TZ</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_rotateX">
+             <property name="text">
+              <string>RX</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_rotateY">
+             <property name="text">
+              <string>RY</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_rotateZ">
+             <property name="text">
+              <string>RZ</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_scaleX">
+             <property name="text">
+              <string>SX</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_scaleY">
+             <property name="text">
+              <string>SY</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driven_scaleZ">
+             <property name="text">
+              <string>SZ</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_invert_driven">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_invert_driver">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_invert_driver">
+             <property name="text">
+              <string>Invert Driver</string>
+             </property>
+             <property name="toolTip">
+              <string>The default of the Inv Driver column: the driver attributes whose input axis is negated</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_translateX">
+             <property name="text">
+              <string>TX</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_translateY">
+             <property name="text">
+              <string>TY</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_translateZ">
+             <property name="text">
+              <string>TZ</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_rotateX">
+             <property name="text">
+              <string>RX</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_rotateY">
+             <property name="text">
+              <string>RY</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_rotateZ">
+             <property name="text">
+              <string>RZ</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_scaleX">
+             <property name="text">
+              <string>SX</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_scaleY">
+             <property name="text">
+              <string>SY</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_driver_scaleZ">
+             <property name="text">
+              <string>SZ</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_invert_driver">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_policy">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>8</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_policy">
+             <property name="text">
+              <string>If it exists</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QComboBox" name="combo_policy">
+             <property name="toolTip">
+              <string>What to do with a driven key that already exists on the mirrored side</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QCheckBox" name="check_unlock">
+             <property name="text">
+              <string>Unlock locked driven</string>
+             </property>
+             <property name="toolTip">
+              <string>Unlock the locked driven attributes while applying</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_policy">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="holder_targets">
+     <layout class="QVBoxLayout" name="verticalLayout_targets">
+      <property name="leftMargin">
+       <number>0</number>
+      </property>
+      <property name="topMargin">
+       <number>0</number>
+      </property>
+      <property name="rightMargin">
+       <number>0</number>
+      </property>
+      <property name="bottomMargin">
+       <number>0</number>
+      </property>
+      <property name="spacing">
+       <number>4</number>
+      </property>
+      <item>
+       <widget class="QFrame" name="widget_targets_body">
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_targets_body">
+         <property name="leftMargin">
+          <number>8</number>
+         </property>
+         <property name="topMargin">
+          <number>6</number>
+         </property>
+         <property name="rightMargin">
+          <number>8</number>
+         </property>
+         <property name="bottomMargin">
+          <number>6</number>
+         </property>
+         <property name="spacing">
+          <number>6</number>
+         </property>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_source">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>8</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="label_source">
+             <property name="text">
+              <string>Source</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radio_driver">
+             <property name="text">
+              <string>Driver</string>
+             </property>
+             <property name="toolTip">
+              <string>Find the driven keys from the driver nodes</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QRadioButton" name="radio_driven">
+             <property name="text">
+              <string>Driven</string>
+             </property>
+             <property name="toolTip">
+              <string>Find the driven keys from the driven nodes</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_source">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_load">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QPushButton" name="btn_load_selection">
+             <property name="text">
+              <string>Load from Selection</string>
+             </property>
+             <property name="toolTip">
+              <string>List the driven keys of the selected nodes</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_load_scene">
+             <property name="text">
+              <string>Load from Scene</string>
+             </property>
+             <property name="toolTip">
+              <string>List every driven key in the scene</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QTableView" name="table_rows">
+           <property name="minimumSize">
+            <size><width>0</width><height>200</height></size>
+           </property>
+           <property name="showGrid">
+            <bool>false</bool>
+           </property>
+           <property name="wordWrap">
+            <bool>false</bool>
+           </property>
+           <property name="editTriggers">
+            <enum>QAbstractItemView::NoEditTriggers</enum>
+           </property>
+           <property name="selectionMode">
+            <enum>QAbstractItemView::NoSelection</enum>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="horizontalLayout_check">
+           <property name="leftMargin">
+            <number>0</number>
+           </property>
+           <property name="topMargin">
+            <number>0</number>
+           </property>
+           <property name="rightMargin">
+            <number>0</number>
+           </property>
+           <property name="bottomMargin">
+            <number>0</number>
+           </property>
+           <property name="spacing">
+            <number>4</number>
+           </property>
+           <item>
+            <widget class="QPushButton" name="btn_check_all">
+             <property name="text">
+              <string>Check All</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_uncheck_all">
+             <property name="text">
+              <string>Uncheck All</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="spacer_check">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QLabel" name="label_summary">
+             <property name="text">
+              <string>Not loaded</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_mirror">
+           <property name="enabled">
+            <bool>false</bool>
+           </property>
+           <property name="text">
+            <string>Mirror</string>
+           </property>
+           <property name="toolTip">
+            <string>Mirror the checked driven keys that are missing or different on the other side</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <spacer name="spacer_page">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+</ui>

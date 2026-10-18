@@ -10,13 +10,15 @@ _EVENTS = {
 }
 
 
-_RELEVANT_MESSAGES = (
-    om.MNodeMessage.kAttributeSet
-    | om.MNodeMessage.kConnectionMade
+_STRUCTURE_MESSAGES = (
+    om.MNodeMessage.kConnectionMade
     | om.MNodeMessage.kConnectionBroken
     | om.MNodeMessage.kAttributeLocked
     | om.MNodeMessage.kAttributeUnlocked
+    | om.MNodeMessage.kAttributeAdded
+    | om.MNodeMessage.kAttributeRemoved
 )
+_VALUE_MESSAGES = om.MNodeMessage.kAttributeSet
 
 
 class SceneWatcher:
@@ -25,15 +27,20 @@ class SceneWatcher:
     callbackを登録し、stopですべて解除する
 
     Args:
-        on_values (Optional[Callable[[], None]]): 追跡中のノードのアトリビュートや接続、
-        現在時間が変わったとき。track_nodesを使う場合は必須。
+        on_values (Optional[Callable[[], None]]): 追跡中のノードの値または現在時間が変わったとき
         on_scene (Optional[Callable[[], None]]): シーンを開いた、または新規にしたとき
+        on_structure (Optional[Callable[[], None]]): 接続、ロック、アトリビュート、名前が
+            変わったとき。Noneの場合はon_valuesを使う
+        on_keys (Optional[Callable[[], None]]): animCurveのキーが変わったとき。
+            Noneの場合はon_valuesを使う
     """
 
-    def __init__(self, on_values, on_scene):
+    def __init__(self, on_values, on_scene, on_structure=None, on_keys=None):
         self._handlers = {
             "values": on_values,
             "scene": on_scene,
+            "structure": on_values if on_structure is None else on_structure,
+            "keys": on_values if on_keys is None else on_keys,
         }
         self._event_ids = []
         self._node_ids = []
@@ -60,20 +67,40 @@ class SceneWatcher:
             names (Iterable[str]): 監視するノード名。見つからないノードは飛ばす
         """
         self._remove_node_callbacks()
-        on_values = _wrap(self._handlers["values"])
+        structure_handler = self._handlers["structure"]
+        values_handler = self._handlers["values"]
+        keys_handler = self._handlers["keys"]
+        if (
+            structure_handler is None
+            and values_handler is None
+            and keys_handler is None
+        ):
+            return
+
+        on_structure = None
+        if structure_handler is not None:
+            on_structure = _wrap(structure_handler)
+
         for name in dict.fromkeys(names):
             node = _get_node(name)
             if node is None:
                 continue
 
-            self._node_ids.append(
-                om.MNodeMessage.addAttributeChangedCallback(
-                    node, self._on_attribute_changed,
-                ),
-            )
-            self._node_ids.append(
-                om.MNodeMessage.addNameChangedCallback(node, on_values),
-            )
+            if (
+                values_handler is not None
+                or structure_handler is not None
+                or keys_handler is not None
+            ):
+                self._node_ids.append(
+                    om.MNodeMessage.addAttributeChangedCallback(
+                        node, self._on_attribute_changed,
+                    ),
+                )
+
+            if on_structure is not None:
+                self._node_ids.append(
+                    om.MNodeMessage.addNameChangedCallback(node, on_structure),
+                )
 
     def stop(self):
         """Remove every callback.
@@ -93,8 +120,19 @@ class SceneWatcher:
         self._node_ids = []
 
     def _on_attribute_changed(self, message, plug, other_plug, client_data):
-        if message & _RELEVANT_MESSAGES:
-            self._handlers["values"]()
+        if message & _STRUCTURE_MESSAGES:
+            handler = self._handlers["structure"]
+        elif message & _VALUE_MESSAGES:
+            is_curve = (
+                plug is not None
+                and plug.node().hasFn(om.MFn.kAnimCurve)
+            )
+            handler = self._handlers["keys" if is_curve else "values"]
+        else:
+            handler = None
+
+        if handler is not None:
+            handler()
 
 
 def _wrap(handler):

@@ -77,7 +77,20 @@
        <attribute name="title">
         <string>Mirror</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_tab_mirror"/>
+       <layout class="QVBoxLayout" name="verticalLayout_tab_mirror">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+       </layout>
       </widget>
       <widget class="QWidget" name="tab_advanced">
        <attribute name="title">

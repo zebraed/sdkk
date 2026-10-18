@@ -4,7 +4,7 @@ Read-only queries for the GUI. Never changes the scene.
 GUI向けの読み取り専用のクエリ
 """
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 from maya import cmds
@@ -124,10 +124,154 @@ class SetupSnapshot:
     driver_attrs: tuple
 
 
-def read_snapshot(state, detail_uuid=None, target_uuids=()):
-    """Read the scene for the current state.
+@dataclass(frozen=True)
+class SetupInput:
+    """Indexed connection information for one driven attribute.
 
-    現在の状態に対するシーンの情報を読む
+    1つのドリブンアトリビュートについて索引化した接続情報
+
+    Attributes:
+        kind (str): "none"、"driver"、"other"、または"foreign"
+        curve (Optional[str]): 現在のドライバーのanimCurve。なければNone
+        key_values (tuple[float, ...]): 現在のドライバーのキー値
+    """
+
+    kind: str
+    curve: Optional[str] = None
+    key_values: tuple = ()
+
+
+@dataclass(frozen=True)
+class SetupConnectionIndex:
+    """Connection data reused while only scene values change.
+
+    値だけが変化する間、再利用するSetup画面の接続索引
+    """
+
+    nodes: dict
+    inspected: tuple
+    driver_plug: Optional[str]
+    value_plugs: dict
+    blocked: dict
+    enabled_plugs: dict
+    key_plugs: tuple
+    plug_keys: dict
+    warnings: tuple
+    inputs: dict
+    driven_state: dict
+    driver_attrs: tuple
+
+
+class SetupSceneReader:
+    """Build a connection index, then refresh only live values.
+
+    接続変更時に索引を作り、時間や値の変更時は現在値だけを読み直す
+    """
+
+    def __init__(self):
+        self._index = None
+
+    @property
+    def index(self):
+        """Optional[SetupConnectionIndex]: 現在の接続索引"""
+        return self._index
+
+    def rebuild(self, state, detail_uuid=None, target_uuids=()):
+        """Rebuild the connection index and read a snapshot.
+
+        Args:
+            state (SetupState): 画面の状態
+            detail_uuid (Optional[str]): 詳細表示中のドリブンノードUUID
+            target_uuids (Collection[str]): キー操作対象のノードUUID
+
+        Returns:
+            SetupSnapshot: 接続と現在値を含む画面情報
+        """
+        self._index = _build_setup_index(
+            state, detail_uuid, target_uuids,
+        )
+        return self.read_values()
+
+    def read_values(self):
+        """Read only current attribute values using the existing index.
+
+        Returns:
+            SetupSnapshot: 索引の接続情報と最新の値を含む画面情報
+
+        Raises:
+            RuntimeError: rebuildより前に呼んだ場合
+        """
+        index = self._index
+        if index is None:
+            raise RuntimeError("Setup connection index has not been built")
+
+        values = {key: None for key in index.inspected}
+        for key, plug in index.value_plugs.items():
+            values[key] = scene.read_value(plug)
+
+        driver_value = None
+        if index.driver_plug is not None:
+            driver_value = scene.read_value(index.driver_plug)
+
+        driver_plug = index.driver_plug
+        if driver_value is None:
+            driver_plug = None
+
+        return SetupSnapshot(
+            nodes=index.nodes,
+            driver_plug=driver_plug,
+            driver_value=driver_value,
+            values=values,
+            blocked=index.blocked,
+            key_plugs=index.key_plugs,
+            summary=summarize_pose_keys(
+                index.plug_keys,
+                driver_value,
+                focus=index.key_plugs,
+            ),
+            warnings=index.warnings,
+            driven_state=index.driven_state,
+            driver_attrs=index.driver_attrs,
+        )
+
+    def refresh_keys(self):
+        """Refresh key positions without traversing scene connections.
+
+        Returns:
+            SetupSnapshot: キー位置と現在値を更新した画面情報
+
+        Raises:
+            RuntimeError: rebuildより前に呼んだ場合
+        """
+        index = self._index
+        if index is None:
+            raise RuntimeError("Setup connection index has not been built")
+
+        inputs = dict(index.inputs)
+        for key, item in tuple(inputs.items()):
+            if item.curve is None:
+                continue
+
+            values = cmds.keyframe(item.curve, q=True, fc=True)
+            key_values = () if values is None else tuple(sorted(values))
+            inputs[key] = replace(item, key_values=key_values)
+
+        plug_keys = {
+            plug: inputs.get(key, SetupInput("none")).key_values
+            for key, plug in index.enabled_plugs.items()
+        }
+        self._index = replace(
+            index,
+            inputs=inputs,
+            plug_keys=plug_keys,
+        )
+        return self.read_values()
+
+
+def read_snapshot(state, detail_uuid=None, target_uuids=()):
+    """Read a complete scene snapshot without retaining an index.
+
+    接続索引を保持せず、現在の状態に対するシーン情報を1回読み取る
 
     Args:
         state (SetupState): 画面の状態
@@ -140,10 +284,16 @@ def read_snapshot(state, detail_uuid=None, target_uuids=()):
     Returns:
         SetupSnapshot: 読み取った結果
     """
+    return SetupSceneReader().rebuild(state, detail_uuid, target_uuids)
+
+
+def _build_setup_index(state, detail_uuid, target_uuids):
     enabled = state.list_plug_keys()
     inspected = list(enabled)
     if detail_uuid is not None:
         inspected += [(detail_uuid, attr) for attr in TRANSFORM_ATTRS]
+
+    inspected = tuple(dict.fromkeys(inspected))
 
     uuids = [node.uuid for node in state.driven]
     uuids += [uuid for uuid, _ in inspected]
@@ -158,72 +308,121 @@ def read_snapshot(state, detail_uuid=None, target_uuids=()):
                 uuid, name, name.rpartition("|")[2], scene.find_node_icon(name),
             )
 
-    driver_attrs = ()
+    driver_keys = ()
+    driver_attrs = set()
     if state.driver is not None and state.driver.uuid in nodes:
-        driver_attrs = tuple(list_driver_attrs(state.driver.uuid))
+        driver_name = nodes[state.driver.uuid].name
+        found = drivenkey.list_driven_keys([driver_name], Side.DRIVER)
+        driver_keys = tuple(found)
+        for key in driver_keys:
+            if key.driver is None:
+                continue
+
+            driver_attrs.add(Plug.parse(key.driver).attr)
+
+    transform_attrs = [
+        attr for attr in TRANSFORM_ATTRS if attr in driver_attrs
+    ]
+    driver_attrs = transform_attrs + sorted(
+        driver_attrs - set(TRANSFORM_ATTRS),
+    )
 
     driver_plug = None
-    driver_value = None
     if (
         state.driver is not None
         and state.driver.attr is not None
         and state.driver.uuid in nodes
     ):
         plug = f"{nodes[state.driver.uuid].name}.{state.driver.attr}"
-        driver_value = scene.read_value(plug)
-        if driver_value is not None:
+        if cmds.objExists(plug):
             driver_plug = plug
 
-    values = {}
+    current_curves = set()
+    if driver_plug is not None:
+        for key in driver_keys:
+            if key.driver is None:
+                continue
+
+            if Plug.parse(key.driver).attr == state.driver.attr:
+                current_curves.add(key.curve)
+
+    value_plugs = {}
     blocked = {}
     plugs = {}
-    for key in dict.fromkeys(inspected):
+    for key in inspected:
         uuid, attr = key
         info = nodes.get(uuid)
         if info is None:
-            values[key] = None
             blocked[key] = "Node not found"
             continue
 
         plug = f"{info.name}.{attr}"
-        values[key] = scene.read_value(plug)
-        if values[key] is None:
+        if not cmds.objExists(plug):
             blocked[key] = f"{info.short_name}.{attr} not found"
-        elif cmds.getAttr(plug, l=True):
-            blocked[key] = f"{info.short_name}.{attr} is locked"
-        elif drivenkey.has_foreign_input(plug):
-            blocked[key] = f"{info.short_name}.{attr} has an incoming connection"
-        else:
-            plugs[key] = plug
-
-    enabled_plugs = {key: plugs[key] for key in enabled if key in plugs}
-    key_plugs = {key: plug for key, plug in enabled_plugs.items() if key[0] in target_uuids}
-    driven_state = {}
-    plug_values = {}
-    for key, plug in plugs.items():
-        if not scene.has_driven_key_input(plug):
             continue
 
-        plug_values[key] = () if driver_plug is None else scene.list_driver_values(driver_plug, plug)
-        driven_state[key] = "driver" if plug_values[key] else "other"
+        value_plugs[key] = plug
+        if cmds.getAttr(plug, l=True):
+            blocked[key] = f"{info.short_name}.{attr} is locked"
+            continue
 
-    plug_keys = {plug: plug_values.get(key, ()) for key, plug in enabled_plugs.items()}
+        plugs[key] = plug
+
+    input_index = drivenkey.inspect_driven_inputs(plugs.values(), driver_keys)
+    inputs = {}
+    driven_state = {}
+    for key, plug in tuple(plugs.items()):
+        keys, has_input = input_index[plug]
+        current = next(
+            (item for item in keys if item.curve in current_curves),
+            None,
+        )
+        if current is not None:
+            values = cmds.keyframe(current.curve, q=True, fc=True)
+            key_values = () if values is None else tuple(sorted(values))
+            inputs[key] = SetupInput("driver", current.curve, key_values)
+            driven_state[key] = "driver"
+        elif keys:
+            inputs[key] = SetupInput("other")
+            driven_state[key] = "other"
+        elif has_input:
+            inputs[key] = SetupInput("foreign")
+            info = nodes[key[0]]
+            blocked[key] = (
+                f"{info.short_name}.{key[1]} has an incoming connection"
+            )
+            plugs.pop(key)
+        else:
+            inputs[key] = SetupInput("none")
+
+    enabled_plugs = {key: plugs[key] for key in enabled if key in plugs}
+    key_plugs = {
+        key: plug
+        for key, plug in enabled_plugs.items()
+        if key[0] in target_uuids
+    }
+    plug_keys = {
+        plug: inputs.get(key, SetupInput("none")).key_values
+        for key, plug in enabled_plugs.items()
+    }
     warnings = []
     for key in dict.fromkeys(enabled):
         if key in blocked:
             warnings.append(blocked[key])
 
-    return SetupSnapshot(
+    return SetupConnectionIndex(
         nodes=nodes,
+        inspected=inspected,
         driver_plug=driver_plug,
-        driver_value=driver_value,
-        values=values,
+        value_plugs=value_plugs,
         blocked=blocked,
+        enabled_plugs=enabled_plugs,
         key_plugs=tuple(key_plugs.values()),
-        summary=summarize_pose_keys(plug_keys, driver_value, focus=key_plugs.values()),
+        plug_keys=plug_keys,
         warnings=tuple(warnings),
+        inputs=inputs,
         driven_state=driven_state,
-        driver_attrs=driver_attrs,
+        driver_attrs=tuple(driver_attrs),
     )
 
 
@@ -395,13 +594,13 @@ def list_export_targets(side, selected_only):
     return targets
 
 
-def plan_import(driven_keys, policy, unlock):
-    """Check whether the driven keys read from a file can be applied. The scene is not changed.
+def plan_driven_keys(driven_keys, policy, unlock):
+    """Check whether driven keys can be applied to the scene. The scene is not changed.
 
-    ファイルから読んだドリブンキーを、シーンへ適用できるかを調べる。シーンは変更しない
+    ドリブンキーを、シーンへ適用できるかを調べる。シーンは変更しない
 
     Args:
-        driven_keys (Iterable[DrivenKeyData]): ファイルのドリブンキー
+        driven_keys (Iterable[DrivenKeyData]): 適用するドリブンキー。ファイルから読んだものや、ミラーした結果
         policy (ConflictPolicy): 適用先に同じ組がすでにある場合の扱い
         unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
 
@@ -409,6 +608,52 @@ def plan_import(driven_keys, policy, unlock):
         list[PlanItem]: driven_keysと同じ順の計画
     """
     return drivenkey.plan_driven_keys(driven_keys, policy, unlock)
+
+
+def list_mirror_sources(side, selected_only):
+    """List the driven keys that can be mirrored, read from the scene.
+
+    ミラー元にできるドリブンキーを、シーンから読んで列挙する
+
+    Args:
+        side (Side): 選択を、ドライバー側とドリブン側のどちらとして探すか
+        selected_only (bool): Trueは選択中のノードから探す。Falseはシーン全体
+
+    Returns:
+        list[DrivenKeyData]: 読み取れたドリブンキー。読み取れないものは含まない
+    """
+    origins = None
+    if selected_only:
+        origins = scene.list_selected_nodes()
+
+    sources = []
+    for key in drivenkey.list_driven_keys(origins, side):
+        if key.status is Status.OK:
+            sources.append(key.read())
+
+    # シーンから読んだ順は決まっていないため、一覧が毎回同じ並びになるよう並べ替える
+    sources.sort(key=lambda data: (str(data.driver), str(data.driven)))
+    return sources
+
+
+def check_mirror(source, rule):
+    """Check the mirrored counterpart of one driven key. The scene is not changed.
+
+    ドリブンキー1本について、ミラー先にミラーした結果と一致するドリブンキーがあるかを調べる
+    シーンは変更しない
+
+    Args:
+        source (DrivenKeyData): ミラー元
+        rule (MirrorRule): ミラー規則
+
+    Returns:
+        Optional[MirrorCheckItem]: 確認結果。名前を置き換えても同じ組になる場合はNone
+    """
+    items = drivenkey.check_mirrored_driven_keys([source], rule)
+    if not items:
+        return None
+
+    return items[0]
 
 
 def list_node_names(uuids):

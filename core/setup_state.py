@@ -1,7 +1,7 @@
 """
 Maya-free state of the SDK Setup screen: which driver and which driven attributes are in use.
 
-SDK Setup画面の状態（どれをドライバーに、どのアトリビュートをドリブンにしているか）
+SDK Setup画面の状態
 """
 from dataclasses import dataclass, replace
 

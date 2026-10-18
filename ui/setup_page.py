@@ -55,8 +55,11 @@ class SetupPage(QtWidgets.QWidget):
         self._driver_custom_view = False
         self._rendering = False
         self._pending_reset = False
+        self._pending_structure = False
+        self._pending_keys = False
         self._scrub = None
         self._tracked = ()
+        self._scene_reader = service.SetupSceneReader()
         self._history = service.read_history()
         self._cleared_key = None
 
@@ -69,7 +72,12 @@ class SetupPage(QtWidgets.QWidget):
         self._timer.setInterval(30)
         self._timer.timeout.connect(self._on_timer)
 
-        self._watcher = SceneWatcher(self._schedule_refresh, self._schedule_reset)
+        self._watcher = SceneWatcher(
+            self._schedule_value_refresh,
+            self._schedule_reset,
+            self._schedule_structure_refresh,
+            self._schedule_key_refresh,
+        )
         self._watcher.start()
         self._refresh()
 
@@ -112,6 +120,22 @@ class SetupPage(QtWidgets.QWidget):
                 group.set_expanded(expanded)
 
         self._presets.restore_values(settings.get("driver_presets"))
+
+    def detach_pose_area(self):
+        """Take the pose area out of this page, so that the window can place it outside the tabs.
+
+        The page keeps drawing into it.
+
+        ポーズの領域（ポーズストリップ、プリセット、Keyボタン）をこのページから外す
+        ウィンドウがタブの外へ置くために使う。描画はこのページが続ける
+
+        Returns:
+            QtWidgets.QWidget: ポーズの領域。親はなくなり、置き先のレイアウトに入れる
+        """
+        holder = self._find(QtWidgets.QWidget, "holder_pose")
+        self.layout().removeWidget(holder)
+        holder.setParent(None)
+        return holder
 
     def emit_status(self):
         """Emit statusChanged with the current context.
@@ -260,35 +284,68 @@ class SetupPage(QtWidgets.QWidget):
 
         return targets
 
-    def _refresh(self):
+    def _refresh(self, structure=True, keys=False):
         self._current_uuid = self._resolve_current_uuid()
-        self._snapshot = service.read_snapshot(
-            self._state, self._current_uuid, self._resolve_target_uuids(),
-        )
-        self._record_history_if_driven()
-        names = tuple(info.name for info in self._snapshot.nodes.values())
-        if names != self._tracked:
-            self._tracked = names
-            self._watcher.track_nodes(names)
+        if structure or self._scene_reader.index is None:
+            self._pending_structure = False
+            self._pending_keys = False
+            self._snapshot = self._scene_reader.rebuild(
+                self._state, self._current_uuid, self._resolve_target_uuids(),
+            )
+            self._record_history_if_driven()
+            names = tuple(info.name for info in self._snapshot.nodes.values())
+            names += tuple(
+                item.curve
+                for item in self._scene_reader.index.inputs.values()
+                if item.curve is not None
+            )
+            if names != self._tracked:
+                self._tracked = names
+                self._watcher.track_nodes(names)
+        elif keys:
+            self._pending_keys = False
+            self._snapshot = self._scene_reader.refresh_keys()
+        else:
+            self._snapshot = self._scene_reader.read_values()
 
         self._render()
 
-    def _schedule_refresh(self):
+    def _schedule_value_refresh(self):
         # スライダー操作中は、離すまで再描画しない（操作の邪魔になるため）
         if self._scrub is None:
             self._timer.start()
 
+    def _schedule_structure_refresh(self):
+        self._pending_structure = True
+        self._pending_keys = False
+        self._schedule_value_refresh()
+
+    def _schedule_key_refresh(self):
+        self._pending_keys = True
+        self._schedule_value_refresh()
+
     def _schedule_reset(self):
         self._pending_reset = True
+        self._pending_structure = True
+        self._pending_keys = False
         self._timer.start()
 
     def _on_timer(self):
+        structure = self._pending_structure
+        keys = self._pending_keys
+        self._pending_structure = False
+        self._pending_keys = False
+        if structure:
+            keys = False
+
         if self._pending_reset:
             self._pending_reset = False
             self._state = SetupState()
             self._current_uuid = None
+            structure = True
+            keys = False
 
-        self._refresh()
+        self._refresh(structure=structure, keys=keys)
 
     def _apply_driver(self, driver):
         """Set the driver. The driven list follows the driver attribute.
@@ -434,7 +491,6 @@ class SetupPage(QtWidgets.QWidget):
         self._exec_item_menu(button.mapToGlobal(pos), [(self._current_uuid, attr)])
 
     def _exec_item_menu(self, global_pos, targets, on_remove=None):
-        # Select Anim Curve ▶、区切り、Remove Item、区切り、Delete DrivenKey ▶ の順に並べる
         menu = QtWidgets.QMenu(self)
         curve_actions = self._add_curve_menu(menu, targets)
         remove = None
@@ -442,17 +498,18 @@ class SetupPage(QtWidgets.QWidget):
             menu.addSeparator()
             remove = menu.addAction("Remove Item")
 
-        delete_actions = self._add_delete_menu(menu, targets)
+        current_actions, all_actions = self._add_delete_menus(menu, targets)
         chosen = menu.exec_(global_pos)
         if chosen in curve_actions:
             self._select_scene_node(curve_actions[chosen])
         elif remove is not None and chosen is remove:
             on_remove()
-        elif chosen in delete_actions:
-            self._delete_driven_key(*delete_actions[chosen])
+        elif chosen in current_actions:
+            self._delete_current_driver_key(*current_actions[chosen])
+        elif chosen in all_actions:
+            self._delete_all_driven_keys(*all_actions[chosen])
 
     def _add_curve_menu(self, menu, targets):
-        # 子メニューにanimCurveの名前を並べ、blendWeightedは区切り線の下の一番下に並べる
         listing = service.list_driven_curves(targets, self._snapshot.driver_plug)
         submenu = menu.addMenu("Select Anim Curve")
         submenu.setEnabled(bool(listing.curves))
@@ -467,39 +524,54 @@ class SetupPage(QtWidgets.QWidget):
 
         return actions
 
-    def _add_delete_menu(self, menu, targets):
+    def _add_delete_menus(self, menu, targets):
         snapshot = self._snapshot
         menu.addSeparator()
-        submenu = menu.addMenu("Delete DrivenKey")
-        actions = {}
+        current_menu = menu.addMenu("Delete Current Driver Key")
+        all_menu = menu.addMenu("Delete All Keys on Attribute")
+        current_actions = {}
+        all_actions = {}
         for uuid, attr in dict.fromkeys(targets):
             state = snapshot.driven_state.get((uuid, attr))
             info = snapshot.nodes.get(uuid)
             if state is None or info is None:
                 continue
 
-            if snapshot.driver_plug is not None and state != "driver":
-                continue
+            label = f"{info.short_name}.{attr}"
+            if snapshot.driver_plug is not None and state == "driver":
+                action = current_menu.addAction(label)
+                current_actions[action] = (uuid, attr)
 
-            actions[submenu.addAction(f"{info.short_name}.{attr}")] = (uuid, attr)
+            curves = service.list_driven_curves([(uuid, attr)]).curves
+            count = len(curves)
+            if count:
+                noun = "key" if count == 1 else "keys"
+                action = all_menu.addAction(f"{label} ({count} {noun})")
+                all_actions[action] = (uuid, attr)
 
-        submenu.setEnabled(bool(actions))
-        return actions
+        current_menu.setEnabled(bool(current_actions))
+        all_menu.setEnabled(bool(all_actions))
+        return current_actions, all_actions
 
-    def _delete_driven_key(self, uuid, attr):
+    def _delete_current_driver_key(self, uuid, attr):
         snapshot = self._snapshot
+        if snapshot.driver_plug is None:
+            return
+
         info = snapshot.nodes[uuid]
         plug = f"{info.name}.{attr}"
         error = None
         try:
-            if snapshot.driver_plug is not None:
-                ops.delete_driven_key(snapshot.driver_plug, plug)
-                command = format_call("delete_driven_key", {"driver": snapshot.driver_plug, "driven": plug})
-            else:
-                ops.delete_driven_keys([plug])
-                command = format_call("delete_driven_keys", {}, args=([plug],))
+            ops.delete_driven_key(snapshot.driver_plug, plug)
+            command = format_call("delete_driven_key", {
+                "driver": snapshot.driver_plug,
+                "driven": plug,
+            })
         except (RuntimeError, ValueError) as exc:
-            error = f"⚠ Cannot delete the driven key of {info.short_name}.{attr}: {exc}"
+            error = (
+                f"⚠ Cannot delete the current driver's key of "
+                f"{info.short_name}.{attr}: {exc}"
+            )
         else:
             print_commands(command)
             self._state = self._state.with_driven_attr(uuid, attr, False)
@@ -508,7 +580,54 @@ class SetupPage(QtWidgets.QWidget):
         if error is not None:
             self._notify(error)
         else:
-            self._notify(f"Deleted the driven key of {info.short_name}.{attr}", warning=False)
+            self._notify(
+                f"Deleted the current driver's key of {info.short_name}.{attr}",
+                warning=False,
+            )
+
+    def _delete_all_driven_keys(self, uuid, attr):
+        snapshot = self._snapshot
+        info = snapshot.nodes[uuid]
+        plug = f"{info.name}.{attr}"
+        curves = service.list_driven_curves([(uuid, attr)]).curves
+        count = len(curves)
+        if not count:
+            self._refresh()
+            self._notify(f"⚠ No driven keys found on {info.short_name}.{attr}")
+            return
+
+        noun = "key" if count == 1 else "keys"
+        answer = QtWidgets.QMessageBox.warning(
+            self,
+            "Delete All Keys on Attribute",
+            f"Delete all {count} driven {noun} on {info.short_name}.{attr}?\n\n"
+            "This removes keys from every driver connected to this attribute.",
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel,
+            QtWidgets.QMessageBox.Cancel,
+        )
+        if answer != QtWidgets.QMessageBox.Yes:
+            return
+
+        error = None
+        deleted = []
+        try:
+            deleted = ops.delete_driven_keys([plug])
+            command = format_call("delete_driven_keys", {}, args=([plug],))
+        except (RuntimeError, ValueError) as exc:
+            error = f"⚠ Cannot delete all driven keys of {info.short_name}.{attr}: {exc}"
+        else:
+            print_commands(command)
+            self._state = self._state.with_driven_attr(uuid, attr, False)
+
+        self._refresh()
+        if error is not None:
+            self._notify(error)
+        else:
+            noun = "key" if len(deleted) == 1 else "keys"
+            self._notify(
+                f"Deleted {len(deleted)} driven {noun} from {info.short_name}.{attr}",
+                warning=False,
+            )
 
     def _select_scene_node(self, name):
         service.select_scene_nodes([name])
@@ -978,7 +1097,7 @@ def _show_page(stack, index):
 
 
 def _set_property(widget, name, value):
-    # QSSのプロパティセレクターは、値を変えたあとに再適用しないと反映されない
+    # MEMO QSSのプロパティセレクターは、値を変えたあとに再適用しないと反映されない
     if widget.property(name) != value:
         widget.setProperty(name, value)
         widget.style().unpolish(widget)
@@ -986,7 +1105,6 @@ def _set_property(widget, name, value):
 
 
 def _set_checked(radio, checked):
-    # autoExclusiveのままでは、全部を未選択にできない
     radio.setAutoExclusive(False)
     radio.setChecked(checked)
     radio.setAutoExclusive(True)

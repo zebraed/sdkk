@@ -246,6 +246,40 @@ def list_driven_keys(nodes=None, side=Side.DRIVEN):
     return [DrivenKey.from_curve(curve) for curve in dict.fromkeys(curves)]
 
 
+def inspect_driven_inputs(plugs, known=()):
+    """Inspect each driven input with one upstream traversal per plug.
+
+    各ドリブンアトリビュートの入力を1回ずつ上流へたどり、接続とカーブをまとめて返す
+
+    Args:
+        plugs (Iterable[str]): 調べるドリブンアトリビュート
+        known (Iterable[DrivenKey]): すでに解決済みで再利用できるドリブンキー
+
+    Returns:
+        dict[str, tuple[tuple[DrivenKey, ...], bool]]: アトリビュートごとの
+            （見つかったドリブンキー、入力接続があるか）
+    """
+    resolved = {key.curve: key for key in known}
+    inspected = {}
+    for plug in dict.fromkeys(plugs):
+        sources = cmds.listConnections(plug, s=True, d=False, scn=True)
+        curves = []
+        if sources is not None:
+            for source in sources:
+                curves.extend(_collect_upstream_curves(source))
+
+        keys = []
+        for curve in dict.fromkeys(curves):
+            if curve not in resolved:
+                resolved[curve] = DrivenKey.from_curve(curve)
+
+            keys.append(resolved[curve])
+
+        inspected[plug] = (tuple(keys), sources is not None)
+
+    return inspected
+
+
 def find_driven_key(driver, driven):
     """Find the driven key that corresponds to a driver/driven pair.
 

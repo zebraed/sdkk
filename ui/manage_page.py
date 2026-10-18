@@ -82,6 +82,23 @@ class ManagePage(QtWidgets.QWidget):
         self._label_file.setToolTip(path)
         self._replan(keep_checked=False)
 
+    def set_section(self, section):
+        """Show both sections, or only one section for a standalone dialog.
+
+        Manageタブでは両方、独立ダイアログでは指定したセクションだけを表示する
+
+        Args:
+            section (Optional[str]): None、"export"、または"import"
+
+        Raises:
+            ValueError: 未知のセクション名の場合
+        """
+        if section not in (None, "export", "import"):
+            raise ValueError(f"Unknown manage section: {section}")
+
+        self._holder_export.setVisible(section in (None, "export"))
+        self._holder_import.setVisible(section in (None, "import"))
+
     def _find(self, cls, name):
         widget = self.findChild(cls, name)
         if widget is None:
@@ -91,6 +108,8 @@ class ManagePage(QtWidgets.QWidget):
 
     def _find_widgets(self):
         find = self._find
+        self._holder_export = find(QtWidgets.QWidget, "holder_export")
+        self._holder_import = find(QtWidgets.QWidget, "holder_import")
         self._radio_driver = find(QtWidgets.QRadioButton, "radio_driver")
         self._btn_load_selection = find(QtWidgets.QPushButton, "btn_load_selection")
         self._btn_load_scene = find(QtWidgets.QPushButton, "btn_load_scene")
@@ -110,19 +129,17 @@ class ManagePage(QtWidgets.QWidget):
         self._btn_import = find(QtWidgets.QPushButton, "btn_import")
 
     def _setup_widgets(self):
-        holder = self._find(QtWidgets.QWidget, "holder_export")
         body = self._find(QtWidgets.QFrame, "widget_export_body")
         group = CollapsibleGroup("EXPORT TARGETS")
-        holder.layout().removeWidget(body)
+        self._holder_export.layout().removeWidget(body)
         group.set_content(body)
-        holder.layout().addWidget(group)
+        self._holder_export.layout().addWidget(group)
 
-        holder = self._find(QtWidgets.QWidget, "holder_import")
         body = self._find(QtWidgets.QFrame, "widget_import_body")
         group = CollapsibleGroup("IMPORT")
-        holder.layout().removeWidget(body)
+        self._holder_import.layout().removeWidget(body)
         group.set_content(body)
-        holder.layout().addWidget(group)
+        self._holder_import.layout().addWidget(group)
 
         self._combo_policy.addItem("Replace", ConflictPolicy.REPLACE)
         self._combo_policy.addItem("Skip", ConflictPolicy.SKIP)
@@ -172,7 +189,7 @@ class ManagePage(QtWidgets.QWidget):
 
     def _replan(self, keep_checked):
         policy = self._combo_policy.currentData()
-        items = service.plan_import(
+        items = service.plan_driven_keys(
             self._document.driven_keys, policy, self._check_unlock.isChecked(),
         )
         self._import_model.set_items(items, keep_checked)
