@@ -16,7 +16,14 @@ from .command.drivenkey import (
     plan_driven_keys,
 )
 from .core.pose_keys import DEFAULT_TOLERANCE
-from .core.state import ConflictPolicy, MirrorStatus, PlanStatus, Side, Status
+from .core.state import (
+    ApplyResult,
+    ConflictPolicy,
+    MirrorStatus,
+    PlanStatus,
+    Side,
+    Status,
+)
 from .core.model import Document, resolve_key_pairs
 from .core.serialize import read_document, write_document
 
@@ -229,16 +236,44 @@ def convert_animation_to_driven_keys(
         except ValueError as exc:
             raise ValueError(f"{plug}: {exc}") from exc
 
-    deleted = animation.delete_animation(plugs)
+    created = []
+    skipped = []
+    failed = []
+    warnings = []
+    deleted = []
+    for plug, data in zip(plugs, driven_keys):
+        connection = animation.detach_animation(plug)
+        result = None
+        try:
+            items = plan_driven_keys([data], policy, unlock)
+            result = drivenkey.apply_plan(items)
+        finally:
+            if result is None or not result.created:
+                animation.restore_animation(connection)
+
+        created.extend(result.created)
+        skipped.extend(result.skipped)
+        failed.extend(result.failed)
+        warnings.extend(result.warnings)
+        if result.created:
+            deleted_curve = animation.delete_detached_animation(connection)
+            if deleted_curve is not None:
+                deleted.append(deleted_curve)
+
     if deleted:
         logger.info("Deleted the source animation: %s", ", ".join(deleted))
 
-    items = plan_driven_keys(driven_keys, policy, unlock)
     label = (
         f"Converted the animation on {len(plugs)} attribute(s) "
         f"driven by {driver}"
     )
-    return _log_apply_result(label, drivenkey.apply_plan(items))
+    result = ApplyResult(
+        created=tuple(created),
+        skipped=tuple(skipped),
+        failed=tuple(failed),
+        warnings=tuple(warnings),
+    )
+    return _log_apply_result(label, result)
 
 
 @undo_chunk
