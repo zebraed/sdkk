@@ -14,6 +14,7 @@ from .core.history import HistoryEntry, parse_history
 from .core.model import Plug
 from .core.pose_keys import PoseSummary, summarize_pose_keys
 from .core.setup_state import TRANSFORM_ATTRS, DriverSpec, SetupState
+from .core.state import Side, Status
 
 SETTINGS_KEY = "sdkk_window_settings"
 HISTORY_KEY = "sdkk_history"
@@ -53,6 +54,27 @@ class NodeInfo:
             name.rpartition("|")[2],
             scene.find_node_icon(name),
         )
+
+
+@dataclass(frozen=True)
+class ExportTarget:
+    """A driver or driven node that has driven keys to export.
+
+    書き出せるドリブンキーを持つ、ドライバーまたはドリブンのノード
+
+    Attributes:
+        info (NodeInfo): ノード
+        attrs (tuple[str, ...]): このノード側のアトリビュート。トランスフォームを画面の並び順で先に、続けてその他を名前順にした
+        partners (int): 反対側のノードの数
+        keys (int): ドリブンキーの数
+        skipped (int): keysのうち、読めず書き出されないものの数
+    """
+
+    info: NodeInfo
+    attrs: tuple
+    partners: int
+    keys: int
+    skipped: int
 
 
 @dataclass(frozen=True)
@@ -311,6 +333,102 @@ def list_driven_curves(targets, driver_plug=None):
             blends.extend(blend_names)
 
     return CurveListing(tuple(dict.fromkeys(curves)), tuple(dict.fromkeys(blends)))
+
+
+def list_export_targets(side, selected_only):
+    """List the nodes that have driven keys to export.
+
+    書き出せるドリブンキーを持つノードを列挙する
+
+    Args:
+        side (Side): ドライバーのノードを探すか、ドリブンのノードを探すか
+        selected_only (bool): Trueは選択中のノードのうち、該当するものだけ。Falseはシーン全体
+            ドリブンの側を解決できないドリブンキーは、どのノードにも数えない
+
+    Returns:
+        list[ExportTarget]: ノードの名前順。見つからなければ空
+    """
+    origins = None
+    selected_uuids = set()
+    if selected_only:
+        origins = scene.list_selected_nodes()
+        selected_uuids = {cmds.ls(name, uid=True)[0] for name in origins}
+
+    groups = {}
+    for key in drivenkey.list_driven_keys(origins, side):
+        own_text, other_text = key.driven, key.driver
+        if side is Side.DRIVER:
+            own_text, other_text = key.driver, key.driven
+
+        if own_text is None:
+            continue
+
+        own = Plug.parse(own_text)
+        uuid = cmds.ls(own.node, uid=True)[0]
+        if selected_only and uuid not in selected_uuids:
+            continue
+
+        group = groups.setdefault(uuid, {"attrs": set(), "partners": set(), "keys": 0, "skipped": 0})
+        group["attrs"].add(own.attr)
+        group["keys"] += 1
+        if key.status is not Status.OK:
+            group["skipped"] += 1
+
+        if other_text is not None:
+            group["partners"].add(cmds.ls(Plug.parse(other_text).node, uid=True)[0])
+
+    targets = []
+    for uuid, group in groups.items():
+        name = scene.find_node(uuid)
+        attrs = group["attrs"]
+        ordered = [attr for attr in TRANSFORM_ATTRS if attr in attrs]
+        ordered += sorted(attrs - set(TRANSFORM_ATTRS))
+        targets.append(ExportTarget(
+            NodeInfo(uuid, name, name.rpartition("|")[2], scene.find_node_icon(name)),
+            tuple(ordered),
+            len(group["partners"]),
+            group["keys"],
+            group["skipped"],
+        ))
+
+    targets.sort(key=lambda target: target.info.name)
+    return targets
+
+
+def plan_import(driven_keys, policy, unlock):
+    """Check whether the driven keys read from a file can be applied. The scene is not changed.
+
+    ファイルから読んだドリブンキーを、シーンへ適用できるかを調べる。シーンは変更しない
+
+    Args:
+        driven_keys (Iterable[DrivenKeyData]): ファイルのドリブンキー
+        policy (ConflictPolicy): 適用先に同じ組がすでにある場合の扱い
+        unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
+
+    Returns:
+        list[PlanItem]: driven_keysと同じ順の計画
+    """
+    return drivenkey.plan_driven_keys(driven_keys, policy, unlock)
+
+
+def list_node_names(uuids):
+    """List the long names of the nodes that still exist.
+
+    まだシーンにあるノードのロングネームを列挙する
+
+    Args:
+        uuids (Iterable[str]): ノードのUUID
+
+    Returns:
+        list[str]: 見つかったノードのロングネーム。順序は入力のまま
+    """
+    names = []
+    for uuid in uuids:
+        name = scene.find_node(uuid)
+        if name is not None:
+            names.append(name)
+
+    return names
 
 
 def select_scene_nodes(names):

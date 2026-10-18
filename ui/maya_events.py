@@ -25,8 +25,9 @@ class SceneWatcher:
     callbackを登録し、stopですべて解除する
 
     Args:
-        on_values (Callable[[], None]): 追跡中のノードのアトリビュートや接続、現在時間が変わったとき
-        on_scene (Callable[[], None]): シーンを開いた、または新規にしたとき
+        on_values (Optional[Callable[[], None]]): 追跡中のノードのアトリビュートや接続、現在時間が変わったとき
+            Noneならその通知は受け取らない。track_nodesを使う場合は必須
+        on_scene (Optional[Callable[[], None]]): シーンを開いた、または新規にしたとき。Noneなら受け取らない
     """
 
     def __init__(self, on_values, on_scene):
@@ -45,6 +46,9 @@ class SceneWatcher:
 
         for event, kind in _EVENTS.items():
             handler = self._handlers[kind]
+            if handler is None:
+                continue
+
             self._event_ids.append(
                 om.MEventMessage.addEventCallback(event, _wrap(handler)),
             )

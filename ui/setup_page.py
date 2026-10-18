@@ -12,6 +12,7 @@ from .. import gui_ops, ops, service
 from ..core.history import push_history
 from ..core.setup_state import AXES, TRANSFORM_KINDS, DriverSpec, SetupState
 from .driven_node_model import DrivenNodeModel
+from .command_print import format_call, print_commands
 from .maya_events import SceneWatcher
 from .node_icons import get_node_icon
 from .widgets.attr_picker import AttrPicker
@@ -490,11 +491,14 @@ class SetupPage(QtWidgets.QWidget):
         try:
             if snapshot.driver_plug is not None:
                 ops.delete_driven_key(snapshot.driver_plug, plug)
+                command = format_call("delete_driven_key", {"driver": snapshot.driver_plug, "driven": plug})
             else:
                 ops.delete_driven_keys([plug])
+                command = format_call("delete_driven_keys", {}, args=([plug],))
         except (RuntimeError, ValueError) as exc:
             error = f"⚠ Cannot delete the driven key of {info.short_name}.{attr}: {exc}"
         else:
+            print_commands(command)
             self._state = self._state.with_driven_attr(uuid, attr, False)
 
         self._refresh()
@@ -682,6 +686,13 @@ class SetupPage(QtWidgets.QWidget):
             ops.move_driven_keys(snapshot.driver_plug, snapshot.key_plugs, old, new)
         except ValueError as exc:
             error = f"⚠ Cannot move the key: {exc}"
+        else:
+            print_commands(format_call("move_driven_keys", {
+                "driver": snapshot.driver_plug,
+                "driven_plugs": list(snapshot.key_plugs),
+                "driver_value": old,
+                "new_value": new,
+            }))
 
         self._refresh()
         if error is not None:
@@ -691,6 +702,11 @@ class SetupPage(QtWidgets.QWidget):
         snapshot = self._snapshot
         if action_id == "delete" and snapshot.driver_plug is not None:
             ops.remove_driven_keys_at(snapshot.driver_plug, snapshot.key_plugs, value)
+            print_commands(format_call("remove_driven_keys_at", {
+                "driver": snapshot.driver_plug,
+                "driven_plugs": list(snapshot.key_plugs),
+                "driver_value": value,
+            }))
             self._refresh()
 
     def _on_preset_clicked(self, value):
@@ -719,6 +735,10 @@ class SetupPage(QtWidgets.QWidget):
         except (RuntimeError, ValueError) as exc:
             error = f"⚠ Key failed: {exc}"
         else:
+            print_commands(format_call("set_driven_keys", {
+                "driver": snapshot.driver_plug,
+                "driven_plugs": list(snapshot.key_plugs),
+            }))
             self._cleared_key = None
         self._refresh()
         if error is not None:

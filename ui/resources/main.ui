@@ -58,7 +58,20 @@
        <attribute name="title">
         <string>Manage</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_tab_manage"/>
+       <layout class="QVBoxLayout" name="verticalLayout_tab_manage">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+       </layout>
       </widget>
       <widget class="QWidget" name="tab_mirror">
        <attribute name="title">
@@ -100,15 +113,18 @@
     <property name="title">
      <string>Tools</string>
     </property>
+    <addaction name="act_export_driven_keys"/>
+    <addaction name="act_import_driven_keys"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
      <string>Help</string>
     </property>
+    <addaction name="act_about"/>
    </widget>
    <addaction name="menu_history"/>
-   <addaction name="menu_options"/>
    <addaction name="menu_tools"/>
+   <addaction name="menu_options"/>
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
@@ -121,6 +137,21 @@
    </property>
    <property name="text">
     <string>Select Node on Row Click</string>
+   </property>
+  </action>
+  <action name="act_export_driven_keys">
+   <property name="text">
+    <string>Export Driven Key...</string>
+   </property>
+  </action>
+  <action name="act_import_driven_keys">
+   <property name="text">
+    <string>Import Driven Key...</string>
+   </property>
+  </action>
+  <action name="act_about">
+   <property name="text">
+    <string>About...</string>
    </property>
   </action>
  </widget>
