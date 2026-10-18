@@ -1,7 +1,7 @@
 """
 Driven key user operations (the entry point for the GUI and scripts).
 
-ドリブンキーのユーザー操作
+ドリブンキーのユーザー操作API
 """
 import datetime
 import logging

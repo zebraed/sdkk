@@ -29,7 +29,7 @@ class DrivenNodeModel(QtCore.QAbstractTableModel):
 
         Args:
             nodes (Sequence[DrivenNodeSpec]): 表示するノード
-            infos (Mapping[str, NodeInfo]): UUIDごとの、シーンにあるノード。なければ行に警告を出す
+            infos (Mapping[str, NodeInfo]): UUIDごとの、シーンにあるノード
         """
         nodes = tuple(nodes)
         if [n.uuid for n in nodes] == [n.uuid for n in self._nodes]:

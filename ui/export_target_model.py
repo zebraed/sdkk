@@ -113,7 +113,7 @@ class ExportTargetModel(QtCore.QAbstractTableModel):
         if role != QtCore.Qt.CheckStateRole or index.column() != 0:
             return False
 
-        self._checked[index.row()] = value == QtCore.Qt.Checked
+        self._checked[index.row()] = QtCore.Qt.CheckState(value) == QtCore.Qt.Checked
         self.dataChanged.emit(index, index, [role])
         return True
 

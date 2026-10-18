@@ -1,7 +1,7 @@
 """
 Prints the Python commands that repeat what the GUI just did, to the Script Editor.
 
-GUIが行った操作を繰り返すPythonコマンドを、Script Editorへ出力する
+GUIが行った操作をPythonコマンドとして、Script Editorへ出力する
 """
 import enum
 
@@ -31,7 +31,8 @@ def format_call(func_name, kwargs, assign=None, args=()):
         kwargs (dict): 渡すキーワード引数。順序はそのまま出力する
             値はEnumのメンバー、Expression、またはreprがコードになる値
         assign (Optional[str]): 戻り値を代入する変数名。Noneなら代入しない
-        args (Sequence): キーワードにできない位置引数。*nodesを受け取る関数に使う。kwargsより前に出力する
+        args (Sequence): キーワードにできない位置引数。*nodesを受け取る関数に使う
+            kwargsより前に出力する
 
     Returns:
         str: 呼び出しのコード。引数がなければ1行、あれば引数ごとに改行する

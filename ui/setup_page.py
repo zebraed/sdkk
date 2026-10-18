@@ -196,6 +196,9 @@ class SetupPage(QtWidgets.QWidget):
         self._list_custom.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self._list_custom.installEventFilter(self)
 
+        self._label_driver_node.installEventFilter(self)
+        self._label_driven_node.installEventFilter(self)
+
     def _wrap_group(self, holder_name, body_name, title):
         holder = self._find(QtWidgets.QWidget, holder_name)
         body = self._find(QtWidgets.QFrame, body_name)
@@ -570,7 +573,26 @@ class SetupPage(QtWidgets.QWidget):
                 self._remove_selected_custom()
                 return True
 
+        if event.type() == QtCore.QEvent.MouseButtonRelease and event.button() == QtCore.Qt.LeftButton:
+            if obj is self._label_driver_node:
+                self._select_node_of_label(self._state.driver)
+                return True
+
+            if obj is self._label_driven_node:
+                self._select_node_of_label(self._state.get_driven(self._current_uuid))
+                return True
+
         return super().eventFilter(obj, event)
+
+    def _select_node_of_label(self, spec):
+        info = None
+        if spec is not None:
+            info = self._snapshot.nodes.get(spec.uuid)
+
+        if info is None:
+            return
+
+        self._select_scene_node(info.name)
 
     # --- history ---
     def list_history(self):
@@ -774,7 +796,8 @@ class SetupPage(QtWidgets.QWidget):
         attr = None if driver is None else driver.attr
         value = _format(snapshot.driver_value, 3)
 
-        self._label_driver_node.setText("(not set)" if name is None else name)
+        selectable = driver is not None and driver.uuid in snapshot.nodes
+        _set_node_label(self._label_driver_node, "(not set)" if name is None else name, selectable)
         _set_node_icon(
             self._label_driver_icon,
             None if driver is None else snapshot.nodes.get(driver.uuid),
@@ -818,9 +841,11 @@ class SetupPage(QtWidgets.QWidget):
         info = None if node is None else snapshot.nodes.get(node.uuid)
         _set_node_icon(self._label_driven_icon, info)
         if node is None:
-            self._label_driven_node.setText("(no node selected)")
+            _set_node_label(self._label_driven_node, "(no node selected)", False)
+        elif info is None:
+            _set_node_label(self._label_driven_node, "(missing node)", False)
         else:
-            self._label_driven_node.setText("(missing node)" if info is None else info.short_name)
+            _set_node_label(self._label_driven_node, info.short_name, True)
 
         self._radio_driven_transform.setText(
             f"Transform [{0 if node is None else len(node.transform)}]"
@@ -921,6 +946,20 @@ def _plural(count, word):
         return word
 
     return f"{word}s"
+
+
+def _set_node_label(label, text, selectable):
+    label.setText(text)
+    label.setProperty("selectable", selectable)
+    if selectable:
+        label.setCursor(QtCore.Qt.PointingHandCursor)
+        label.setToolTip("Click to select the node in Maya")
+    else:
+        label.unsetCursor()
+        label.setToolTip("")
+
+    label.style().unpolish(label)
+    label.style().polish(label)
 
 
 def _set_node_icon(label, info):

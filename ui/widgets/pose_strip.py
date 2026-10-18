@@ -7,8 +7,10 @@ from Qt import QtCore, QtGui, QtWidgets
 
 from ...core.pose_keys import (
     DEFAULT_TOLERANCE,
+    locate_on_single_mark,
     locate_on_strip,
     locate_value,
+    locate_value_on_single_mark,
     plan_strip_positions,
     settle_dragged_value,
 )
@@ -22,11 +24,13 @@ class PoseStripWidget(QtWidgets.QWidget):
     Dragging with the left button works as a slider for the driver: the
     value under the mouse is sent while dragging. It snaps to a mark
     near the mouse, and to steps of 0.1 while Shift is held. It needs at
-    least two marks to know the scale.
+    least one mark to know the scale; with a single mark, the strip spans
+    the mark value plus and minus max(abs(value), 1.0).
 
     左ボタンのドラッグは、ドライバーの値のスライダーとして働き、ドラッグ中はマウス位置の値を送る
     マウスの近くのマーカーには吸い付き、Shiftを押している間は0.1刻みにする
-    目盛りを決めるため、マーカーが2つ以上必要
+    目盛りを決めるため、マーカーが1つ以上必要。1つだけのときは、マーカーの値の前後
+    max(abs(値), 1.0)をストリップの範囲とする
 
     Dragging a mark with the middle button moves its key, between the
     neighbouring marks. Holding Shift snaps the value to steps of 0.1.
@@ -205,7 +209,12 @@ class PoseStripWidget(QtWidgets.QWidget):
         values, fractions, xs = self._layout_marks()
         usable = max(self.width() - self._SIDE * 2, 1)
         x = event.pos().x()
-        raw = locate_value(values, fractions, (x - self._SIDE) / usable)
+        fraction = (x - self._SIDE) / usable
+        if len(values) == 1:
+            raw = locate_value_on_single_mark(values[0], fraction)
+        else:
+            raw = locate_value(values, fractions, fraction)
+
         if raw is None:
             return None
 
@@ -343,7 +352,11 @@ class PoseStripWidget(QtWidgets.QWidget):
             self._draw_mark(painter, mark, x, y)
 
         if self._current is not None:
-            fraction = locate_on_strip(values, fractions, self._current)
+            if len(values) == 1:
+                fraction = locate_on_single_mark(values[0], self._current)
+            else:
+                fraction = locate_on_strip(values, fractions, self._current)
+
             usable = max(self.width() - self._SIDE * 2, 1)
             self._draw_current(painter, self._SIDE + fraction * usable, y)
 

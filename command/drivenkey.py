@@ -875,27 +875,105 @@ def _read_existing_data(item):
 
 def _apply_item(item, blend_nodes):
     data = item.data
-    with maya_utils.unlocked_attr(str(data.driven)):
-        if item.existing is not None:
-            DrivenKey.from_curve(item.existing).delete()
-
-        curve, warning = _create_curve(data, blend_nodes)
-        warnings = [] if warning is None else [warning]
+    existing = None
+    existing_data = None
+    if item.existing is not None:
+        existing = DrivenKey.from_curve(item.existing)
+        # 置換に失敗しても元へ戻せるよう、削除前に既存データを読む
         try:
-            skipped = write_curve(curve, data.curve)
-            if skipped:
-                warnings.append(
-                    f"Skipped curve attributes: {', '.join(skipped)}",
+            existing_data = existing.read()
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Cannot back up existing driven key {item.existing}: {exc}",
+            ) from exc
+
+    with maya_utils.unlocked_attr(str(data.driven)):
+        if existing is None:
+            return _create_driven_key(data, blend_nodes)
+
+        try:
+            existing.delete()
+            return _create_driven_key(data, blend_nodes)
+        except RuntimeError as apply_error:
+            try:
+                _restore_driven_key(
+                    existing_data, item.existing, blend_nodes,
                 )
+            except RuntimeError as restore_error:
+                message = (
+                    f"{str(apply_error).strip()}\n"
+                    f"Failed to restore existing driven key "
+                    f"{item.existing}: {str(restore_error).strip()}"
+                )
+                raise RuntimeError(message) from restore_error
 
-            name = build_curve_name(data.driver, data.driven, data.curve_type)
-            if data.name is not None:
-                name = strip_path_and_namespace(data.name)
-
-            return cmds.rename(curve, name), warnings
-        except RuntimeError:
-            DrivenKey.from_curve(curve).delete()
             raise
+
+
+def _create_driven_key(data, blend_nodes):
+    curve, warning = _create_curve(data, blend_nodes)
+    warnings = [] if warning is None else [warning]
+    try:
+        skipped = write_curve(curve, data.curve)
+        if skipped:
+            warnings.append(
+                f"Skipped curve attributes: {', '.join(skipped)}",
+            )
+
+        name = build_curve_name(data.driver, data.driven, data.curve_type)
+        if data.name is not None:
+            name = strip_path_and_namespace(data.name)
+
+        return cmds.rename(curve, name), warnings
+    except RuntimeError:
+        DrivenKey.from_curve(curve).delete()
+        raise
+
+
+def _restore_driven_key(data, original_curve, blend_nodes):
+    """Restore a driven key after a failed replacement.
+
+    置換に失敗したドリブンキーを元のデータから復元する
+
+    Args:
+        data (DrivenKeyData): 削除前に読み取ったドリブンキー
+        original_curve (str): 削除前のanimCurveノード名
+        blend_nodes (dict): この適用で作ったblendWeighted
+
+    Raises:
+        RuntimeError: 復元に失敗した場合
+    """
+    current = find_driven_key(str(data.driver), str(data.driven))
+    if current is not None:
+        current.delete()
+
+    if cmds.objExists(original_curve):
+        DrivenKey.from_curve(original_curve).delete()
+
+    curve, warnings = _create_driven_key(data, blend_nodes)
+    if curve != original_curve:
+        curve = cmds.rename(curve, original_curve)
+
+    restored = DrivenKey.from_curve(curve)
+    if restored.status is not Status.OK:
+        raise RuntimeError(
+            f"Restored driven key {curve} is {restored.status.value}",
+        )
+
+    restored_blend = restored.route.get_blend_data()
+    if len(restored_blend) != len(data.blend):
+        raise RuntimeError(
+            f"Blend chain has {len(restored_blend)} level(s), "
+            f"expected {len(data.blend)}",
+        )
+
+    levels = zip(restored_blend, data.blend)
+    for restored_level, original_level in levels:
+        if restored_level.name != original_level.name:
+            cmds.rename(restored_level.name, original_level.name)
+
+    if warnings:
+        raise RuntimeError("; ".join(warnings))
 
 
 def _create_curve(data, blend_nodes):

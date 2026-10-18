@@ -1,7 +1,6 @@
 """
-Maya-free summary of the keys on the driver: the pose strip marks and how many attributes are keyed.
-
-ドライバー上のキーの集計（ポーズストリップのマーカーと、キーが打たれたアトリビュートの数）
+Maya-free summary of the keys on the driver
+ドライバー上のキーの集計
 """
 import math
 from dataclasses import dataclass
@@ -14,10 +13,6 @@ class KeyStatus(Enum):
     """How many of the driven attributes have a key at the current driver value.
 
     現在のドライバー値で、ドリブンアトリビュートのうちいくつにキーがあるか
-
-    Each member carries what the screen shows for it.
-
-    表示に使う記号と文言は各メンバーが持つ
     """
 
     NONE = ("○", "No Key", "SET KEY")
@@ -30,9 +25,9 @@ class KeyStatus(Enum):
         self.button_text = button_text
 
     def describe(self, keyed, total, with_count=True):
-        """Build the status text such as "◐ Keyed 5 / 8".
+        """Build the status text such as "Keyed 5 / 8".
 
-        "◐ Keyed 5 / 8"のような状態の文字列を作る
+        "Keyed 5 / 8"のような状態の文字列を作る
 
         Args:
             keyed (int): キーがあるアトリビュートの数
@@ -107,21 +102,6 @@ def summarize_pose_keys(plug_keys, driver_value, tolerance=DEFAULT_TOLERANCE, fo
 
     全ドリブンアトリビュートのキー位置を、ポーズのマーカーへまとめる
 
-    The marks are counted against the focused attributes, which are the
-    ones a key will be set on. A mark that only unfocused attributes
-    have is counted against all attributes and is not focused. keyed
-    and total count the focused attributes only.
-
-    マーカーの数え方と、keyed・totalは、キーを打つ対象である注目アトリビュートが基準になる
-    注目していないアトリビュートにだけあるキーは、全アトリビュートに対する数で数え、
-    focusedをFalseにする
-
-    Key positions within the tolerance are one mark, since each curve
-    can hold a slightly different driver value for the same pose.
-
-    カーブごとに同じポーズでもドライバー値が少しずれることがあるため、許容誤差以内の
-    キー位置は1つのマーカーにまとめる
-
     Args:
         plug_keys (Mapping[Hashable, Sequence[float]]): アトリビュートごとのキーのドライバー値
             キーがないアトリビュートは空の並びにする
@@ -169,11 +149,6 @@ def plan_strip_positions(values, min_gap):
     """Decide where each mark sits along the strip, as fractions from 0.0 to 1.0.
 
     各マーカーのストリップ上の位置を、0.0から1.0の割合で決める
-
-    Marks are placed in proportion to their values. If any two neighbours
-    would be closer than min_gap, the marks are spaced evenly instead.
-
-    値に比例して配置する。隣どうしがmin_gapより近くなる場合は、等間隔に切り替える
 
     Args:
         values (Sequence[float]): 昇順のドライバー値
@@ -243,10 +218,6 @@ def locate_value(values, positions, fraction):
 
     ストリップ上の位置にあたるドライバー値を返す。locate_on_stripの逆
 
-    A position outside the marks is extended along the nearest end segment.
-
-    マーカーの範囲外の位置は、端の区間をそのまま延ばして求める
-
     Args:
         values (Sequence[float]): 昇順のマーカーのドライバー値
         positions (Sequence[float]): valuesと同じ数の、マーカーの位置（0.0から1.0）
@@ -303,3 +274,38 @@ def locate_on_strip(values, positions, value):
             return positions[index] + ratio * (positions[index + 1] - positions[index])
 
     return None
+
+
+def locate_value_on_single_mark(mark_value, fraction):
+    """Return the driver value at a position on a strip that has only one mark.
+
+    マーカーが1つだけのストリップで、位置にあたるドライバー値を返す
+
+    Args:
+        mark_value (float): マーカーのドライバー値
+        fraction (float): ストリップ上の位置。0.0から1.0の外も指定できる
+
+    Returns:
+        float: ドライバー値
+    """
+    half_span = max(abs(mark_value), 1.0)
+    return mark_value + (fraction - 0.5) * 2 * half_span
+
+
+def locate_on_single_mark(mark_value, value):
+    """Return where a driver value falls on a strip that has only one mark.
+    The inverse of locate_value_on_single_mark.
+
+    マーカーが1つだけのストリップで、ドライバー値がどこにあたるかを返す
+    locate_value_on_single_markの逆
+
+    Args:
+        mark_value (float): マーカーのドライバー値
+        value (float): 位置を知りたいドライバー値
+
+    Returns:
+        float: 位置（0.0から1.0）
+    """
+    half_span = max(abs(mark_value), 1.0)
+    fraction = 0.5 + (value - mark_value) / (2 * half_span)
+    return min(max(fraction, 0.0), 1.0)

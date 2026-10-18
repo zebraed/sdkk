@@ -2,7 +2,6 @@ QStatusBar {
     border-top: 1px solid #2b2b2b;
 }
 
-/* 現在のセルの点線の枠（フォーカス矩形）を出さない。Deleteキーなどのキー操作はそのまま使える */
 QTableView, QListWidget {
     outline: 0;
 }
@@ -17,6 +16,12 @@ QLabel#label_driven_node {
     font-weight: bold;
 }
 
+QLabel#label_driver_node[selectable="true"]:hover,
+QLabel#label_driven_node[selectable="true"]:hover {
+    color: #52a7e0;
+    text-decoration: underline;
+}
+
 QLabel#label_key_status {
     font-weight: bold;
 }
@@ -26,7 +31,6 @@ QPushButton#btn_key {
 }
 
 /* すでにドリブンキーを動かしているDriverのアトリビュート */
-/* 通常と同じ寸法にし、色だけを変える。文字がないので余白もなくして中央に揃える */
 QRadioButton[isDriver="true"],
 QRadioButton[isDriver="false"] {
     spacing: 0px;
@@ -53,7 +57,6 @@ QRadioButton[isDriver="true"]::indicator:checked {
     background-color: #f5a623;
 }
 
-/* DriverとDrivenの3x3: 罫線で表にする */
 QLabel[gridCell="true"] {
     border: 1px solid #2b2b2b;
     padding: 2px 6px;
@@ -86,7 +89,7 @@ QToolButton[gridCell="true"]:hover {
     background-color: #5c5c5c;
 }
 
-/* ドリブンキーで動いているセル: 現在のドライバーはオレンジ、別のドライバーは青灰 */
+/* ドリブンキーで動いているセル*/
 QToolButton[gridCell="true"][driven="driver"] {
     background-color: #7a5420;
     color: #ffe3b0;
@@ -97,7 +100,6 @@ QToolButton[gridCell="true"][driven="other"] {
     color: #c4d6e2;
 }
 
-/* チェックは、SDKを打つ編集対象 */
 QToolButton[gridCell="true"]:checked {
     background-color: #5285a6;
     color: #ffffff;
