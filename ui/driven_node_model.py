@@ -5,13 +5,15 @@ Table model of the driven nodes: Node and Attributes.
 """
 from Qt import QtCore
 
+from ..i18n import tr
 from .node_icons import get_node_icon
+from .translate import TranslatedTableModel
 
 COLUMNS = ("Node", "Attributes")
 UUID_ROLE = QtCore.Qt.UserRole
 
 
-class DrivenNodeModel(QtCore.QAbstractTableModel):
+class DrivenNodeModel(TranslatedTableModel):
     """Shows a SetupState's driven nodes. It only displays; the page edits the state.
 
     SetupStateのドリブンのノードを表示する
@@ -88,7 +90,7 @@ class DrivenNodeModel(QtCore.QAbstractTableModel):
 
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
-            return COLUMNS[section]
+            return tr(COLUMNS[section])
 
         return None
 
@@ -102,7 +104,7 @@ class DrivenNodeModel(QtCore.QAbstractTableModel):
         if role == QtCore.Qt.DisplayRole:
             if column == 0:
                 if info is None:
-                    return "(missing node)"
+                    return tr("(missing node)")
 
                 return info.short_name
 

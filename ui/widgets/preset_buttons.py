@@ -9,6 +9,8 @@ import numbers
 
 from Qt import QtCore, QtGui, QtWidgets
 
+from .. import translate
+
 DEFAULT_VALUES = (-1.0, -0.5, 0.0, 0.5, 1.0)
 
 
@@ -86,11 +88,12 @@ class PresetButton(QtWidgets.QPushButton):
         self._value = value
         self.setText(format_value(value))
         if value == 0:
-            action = "set the driver to 0"
+            translate.bind(self, "setToolTip", "Click: set the driver to 0\nMiddle-click: edit this value")
         else:
-            action = f"add {_format_exact(value)} to the driver"
-
-        self.setToolTip(f"Click: {action}\nMiddle-click: edit this value")
+            translate.bind(
+                self, "setToolTip", "Click: add {amount} to the driver\nMiddle-click: edit this value",
+                amount=_format_exact(value),
+            )
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.MiddleButton:

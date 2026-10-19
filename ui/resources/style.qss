@@ -30,6 +30,15 @@ QPushButton#btn_key {
     font-weight: bold;
 }
 
+QPushButton#btn_key[modified="true"]:enabled {
+    background-color: #6f63e0;
+    color: #ffffff;
+}
+
+QPushButton#btn_key[modified="true"]:enabled:hover {
+    background-color: #8379f0;
+}
+
 /* すでにドリブンキーを動かしているDriverのアトリビュート */
 QRadioButton[isDriver="true"],
 QRadioButton[isDriver="false"] {
@@ -118,4 +127,9 @@ QToolButton[gridCell="true"]:disabled {
 
 QToolButton[gridCell="true"][blocked="true"] {
     color: #c9a25b;
+}
+
+QLabel#label_empty_hint {
+    color: #8a8a8a;
+    padding: 16px;
 }

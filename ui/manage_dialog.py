@@ -4,6 +4,7 @@ ManageタブのExportまたはImportを再利用する非モーダルダイア�
 """
 from Qt import QtCore, QtWidgets
 
+from . import translate
 from .manage_page import ManagePage
 
 
@@ -21,20 +22,21 @@ class ManageDialog(QtWidgets.QDialog):
     Args:
         section (str): "export"または"import"
         select_on_click (QtWidgets.QAction): 行クリック時の選択設定
+        unlock_locked (QtWidgets.QAction): 適用中にロックされたドリブンを解除するかを決めるチェック付きアクション
         parent (Optional[QtWidgets.QWidget]): 親ウィンドウ
     """
 
-    def __init__(self, section, select_on_click, parent=None):
+    def __init__(self, section, select_on_click, unlock_locked, parent=None):
         if section not in _TITLES:
             raise ValueError(f"Unknown manage dialog section: {section}")
 
         super().__init__(parent)
-        self.setWindowTitle(_TITLES[section])
+        translate.bind(self, "setWindowTitle", _TITLES[section])
         self.setWindowModality(QtCore.Qt.NonModal)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.resize(620, 380)
 
-        self.page = ManagePage(select_on_click, self)
+        self.page = ManagePage(select_on_click, unlock_locked, self)
         self.page.set_section(section)
         self._message = QtWidgets.QLabel()
         self._message.setObjectName("label_context")

@@ -9,13 +9,16 @@ import re
 from Qt import QtCompat, QtCore, QtWidgets
 
 from .. import ops, service
+from ..i18n import tr
 from ..core.model import MirrorRule, ReplaceMapper
 from ..core.setup_state import TRANSFORM_ATTRS
 from ..core.state import ConflictPolicy, Side
+from . import translate
 from .command_print import PACKAGE, Expression, format_call, print_commands
 from .maya_events import SceneWatcher
-from .mirror_row_model import FIXABLE, MirrorRow, MirrorRowModel
+from .mirror_row_model import MirrorRow, MirrorRowModel, is_fixable
 from .widgets.collapsible_group import CollapsibleGroup
+from .widgets.empty_hint import EmptyHint
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "mirror_page.ui")
 DEFAULT_DRIVEN_INVERT = ("translateX", "translateY", "translateZ")
@@ -31,15 +34,21 @@ class MirrorPage(QtWidgets.QWidget):
 
     行ごとに反転の指定を持つ。最初はルールの既定値で、行で直した指定は、そのドリブンキーに残る
 
+    Args:
+        unlock_locked (QtWidgets.QAction): 適用中にロックされたドリブンを解除するかを決めるチェック付きアクション
+        parent (Optional[QtWidgets.QWidget]): 親
+
     Signals:
         messageChanged (str, bool): StatusBarに出す文字列と、警告かどうか
     """
 
     messageChanged = QtCore.Signal(str, bool)
 
-    def __init__(self, parent=None):
+    def __init__(self, unlock_locked, parent=None):
         super().__init__(parent)
         QtCompat.loadUi(UI_PATH, self)
+        translate.bind_ui(self)
+        self._unlock_locked = unlock_locked
         self._side = Side.DRIVER
         self._sources = []
         self._overrides = {}
@@ -75,7 +84,6 @@ class MirrorPage(QtWidgets.QWidget):
             "mirror_invert_driven": self._list_defaults(self._checks_driven),
             "mirror_invert_driver": self._list_defaults(self._checks_driver),
             "mirror_policy": self._combo_policy.currentData().value,
-            "mirror_unlock": self._check_unlock.isChecked(),
         }
 
     def apply_settings(self, settings):
@@ -91,10 +99,9 @@ class MirrorPage(QtWidgets.QWidget):
             if isinstance(text, str):
                 edit.setText(text)
 
-        for key, check in (("mirror_regex", self._check_regex), ("mirror_unlock", self._check_unlock)):
-            checked = settings.get(key)
-            if isinstance(checked, bool):
-                check.setChecked(checked)
+        regex = settings.get("mirror_regex")
+        if isinstance(regex, bool):
+            self._check_regex.setChecked(regex)
 
         for key, checks in (
             ("mirror_invert_driven", self._checks_driven),
@@ -124,7 +131,6 @@ class MirrorPage(QtWidgets.QWidget):
         self._btn_swap = find(QtWidgets.QPushButton, "btn_swap")
         self._check_regex = find(QtWidgets.QCheckBox, "check_regex")
         self._combo_policy = find(QtWidgets.QComboBox, "combo_policy")
-        self._check_unlock = find(QtWidgets.QCheckBox, "check_unlock")
         self._radio_driver = find(QtWidgets.QRadioButton, "radio_driver")
         self._btn_load_selection = find(QtWidgets.QPushButton, "btn_load_selection")
         self._btn_load_scene = find(QtWidgets.QPushButton, "btn_load_scene")
@@ -147,18 +153,23 @@ class MirrorPage(QtWidgets.QWidget):
         ):
             holder = self._find(QtWidgets.QWidget, holder_name)
             body = self._find(QtWidgets.QFrame, body_name)
-            group = CollapsibleGroup(title)
+            group = CollapsibleGroup()
+            translate.bind(group, "setTitle", title)
             holder.layout().removeWidget(body)
             group.set_content(body)
             holder.layout().addWidget(group)
 
-        self._combo_policy.addItem("Replace", ConflictPolicy.REPLACE)
-        self._combo_policy.addItem("Skip", ConflictPolicy.SKIP)
+        self._combo_policy.addItem("", ConflictPolicy.REPLACE)
+        self._combo_policy.addItem("", ConflictPolicy.SKIP)
+        translate.bind(self._combo_policy, "setItemText", "Replace", 0)
+        translate.bind(self._combo_policy, "setItemText", "Skip", 1)
         for attr, check in self._checks_driven.items():
             check.setChecked(attr in DEFAULT_DRIVEN_INVERT)
 
         self._table.setModel(self._model)
+        EmptyHint(self._table, "Press Load from Selection or Load from Scene to list the driven keys")
         self._table.verticalHeader().hide()
+        self._table.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
         header = self._table.horizontalHeader()
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
@@ -174,6 +185,7 @@ class MirrorPage(QtWidgets.QWidget):
         for check in (*self._checks_driven.values(), *self._checks_driver.values()):
             check.toggled.connect(self._rebuild)
 
+        self._unlock_locked.toggled.connect(self._on_unlock_toggled)
         self._radio_driver.toggled.connect(self._on_side_toggled)
         self._btn_load_selection.clicked.connect(self._on_load_selection)
         self._btn_load_scene.clicked.connect(self._on_load_scene)
@@ -226,8 +238,17 @@ class MirrorPage(QtWidgets.QWidget):
         self._sources = []
         self._overrides = {}
         self._model.set_rows([], keep_checked=False)
-        self._label_summary.setText("Not loaded")
+        translate.bind(self._label_summary, "setText", "Not loaded")
         self._btn_mirror.setEnabled(False)
+
+    def _is_locked(self, item):
+        if item.target is None:
+            return False
+
+        return bool(service.list_locked_plugs([str(item.target.driven)]))
+
+    def _on_unlock_toggled(self, _checked=False):
+        self._rebuild(keep_checked=False)
 
     def _on_scene_changed(self):
         self._clear()
@@ -237,7 +258,8 @@ class MirrorPage(QtWidgets.QWidget):
             mapper = self._build_mapper()
         except (ValueError, re.error) as exc:
             self._model.set_rows([], keep_checked=False)
-            self._label_summary.setText(f"⚠ {exc}")
+            # 例外の文言が原文。カタログにあれば翻訳される
+            translate.bind(self._label_summary, "setText", f"⚠ {exc}")
             self._btn_mirror.setEnabled(False)
             return
 
@@ -248,11 +270,13 @@ class MirrorPage(QtWidgets.QWidget):
             rule = self._build_rule(mapper, row_key, source)
             item = service.check_mirror(source, rule)
             if item is not None:
-                rows.append(MirrorRow(source, item, driver_flag, driven_flag))
+                locked = self._is_locked(item)
+                blocked = locked and not self._unlock_locked.isChecked()
+                rows.append(MirrorRow(source, item, driver_flag, driven_flag, locked, blocked))
 
         self._model.set_rows(rows, keep_checked)
         if self._sources and not rows:
-            self._label_summary.setText("No driven keys with the Search text in their names")
+            translate.bind(self._label_summary, "setText", "No driven keys with the Search text in their names")
             self._btn_mirror.setEnabled(False)
             return
 
@@ -264,8 +288,11 @@ class MirrorPage(QtWidgets.QWidget):
             return
 
         checked = self._model.list_checked_rows()
-        fixable = [row for row in checked if row.item.status in FIXABLE]
-        self._label_summary.setText(f"{len(checked)} / {total} checked · {len(fixable)} to mirror")
+        fixable = [row for row in checked if is_fixable(row)]
+        translate.bind(
+            self._label_summary, "setText", "{checked} / {total} checked · {fixable} to mirror",
+            checked=len(checked), total=total, fixable=len(fixable),
+        )
         self._btn_mirror.setEnabled(bool(fixable))
 
     def _on_swap(self, _checked=False):
@@ -286,9 +313,13 @@ class MirrorPage(QtWidgets.QWidget):
         self._overrides = {}
         self._sources = service.list_mirror_sources(self._side, selected_only)
         if not self._sources:
-            where = "in the selection" if selected_only else "in the scene"
+            if selected_only:
+                source = "No driven keys in the selection"
+            else:
+                source = "No driven keys in the scene"
+
             self._model.set_rows([], keep_checked=False)
-            self._label_summary.setText(f"No driven keys {where}")
+            translate.bind(self._label_summary, "setText", source)
             self._btn_mirror.setEnabled(False)
             return
 
@@ -325,31 +356,30 @@ class MirrorPage(QtWidgets.QWidget):
     def _on_mirror(self, _checked=False):
         rows = []
         for row in self._model.list_checked_rows():
-            if row.item.status in FIXABLE:
+            if is_fixable(row):
                 rows.append(row)
 
         if not rows:
-            self.messageChanged.emit("⚠ No checked driven keys to mirror", True)
+            self.messageChanged.emit("⚠ " + tr("No checked driven keys to mirror"), True)
             return
 
         targets = [row.item.target for row in rows]
         policy = self._combo_policy.currentData()
-        unlock = self._check_unlock.isChecked()
+        unlock = self._unlock_locked.isChecked()
         items = service.plan_driven_keys(targets, policy, unlock)
         result = ops.apply_plan(items)
         self._print_mirror_command(rows, policy, unlock)
         self._rebuild(keep_checked=True)
 
-        text = f"Mirrored {len(result.created)} driven key(s)"
         if result.skipped or result.failed:
-            text = (
-                f"⚠ {text}, skipped {len(result.skipped)}, failed {len(result.failed)}. "
-                "See the Script Editor"
+            text = tr(
+                "⚠ Mirrored {created} driven key(s), skipped {skipped}, failed {failed}. See the Script Editor",
+                created=len(result.created), skipped=len(result.skipped), failed=len(result.failed),
             )
             self.messageChanged.emit(text, True)
             return
 
-        self.messageChanged.emit(text, False)
+        self.messageChanged.emit(tr("Mirrored {created} driven key(s)", created=len(result.created)), False)
 
     def _print_mirror_command(self, rows, policy, unlock):
         # 反転はアトリビュート名で指定するため、反転の組が同じ行ごとに1回の呼び出しにする

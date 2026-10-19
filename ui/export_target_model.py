@@ -3,13 +3,15 @@ Table model of the export targets: Node, Attributes, the partner count, Keys and
 """
 from Qt import QtCore
 
+from ..i18n import tr
 from ..core.setup_state import TRANSFORM_ATTRS, get_transform_label
 from .node_icons import get_node_icon
+from .translate import TranslatedTableModel
 
 UUID_ROLE = QtCore.Qt.UserRole
 
 
-class ExportTargetModel(QtCore.QAbstractTableModel):
+class ExportTargetModel(TranslatedTableModel):
     """Shows the export targets with a check box on each. It only displays; the page loads them.
     """
 
@@ -121,7 +123,8 @@ class ExportTargetModel(QtCore.QAbstractTableModel):
         if orientation != QtCore.Qt.Horizontal or role != QtCore.Qt.DisplayRole:
             return None
 
-        return ("Node", "Attributes", self._partner_title, "Keys", "Status")[section]
+        titles = ("Node", "Attributes", self._partner_title, "Keys", "Status")
+        return tr(titles[section])
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if not index.isValid():
@@ -170,9 +173,9 @@ def _format_cell(target, column):
         return str(target.keys)
 
     if target.skipped == 0:
-        return "OK"
+        return tr("OK")
 
-    return f"{target.skipped} skipped"
+    return tr("{count} skipped", count=target.skipped)
 
 
 def _format_attrs(attrs):

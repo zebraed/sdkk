@@ -302,16 +302,6 @@
             </widget>
            </item>
            <item>
-            <widget class="QCheckBox" name="check_unlock">
-             <property name="toolTip">
-              <string>Unlock the locked driven attributes while applying</string>
-             </property>
-             <property name="text">
-              <string>Unlock locked driven</string>
-             </property>
-            </widget>
-           </item>
-           <item>
             <spacer name="spacer_policy">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>

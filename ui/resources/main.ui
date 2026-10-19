@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>sdkk</string>
+   <string>SDKK</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_main">
@@ -37,7 +37,7 @@
       </property>
       <widget class="QWidget" name="tab_setup">
        <attribute name="title">
-        <string>SDK Setup</string>
+        <string>Setup</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_tab_setup">
         <property name="leftMargin">
@@ -56,7 +56,7 @@
       </widget>
       <widget class="QWidget" name="tab_manage">
        <attribute name="title">
-        <string>Manage</string>
+        <string>I/O</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_tab_manage">
         <property name="leftMargin">
@@ -96,7 +96,20 @@
        <attribute name="title">
         <string>Advanced</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_tab_advanced"/>
+       <layout class="QVBoxLayout" name="verticalLayout_tab_advanced">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>0</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+       </layout>
       </widget>
      </widget>
     </item>
@@ -120,7 +133,14 @@
     <property name="title">
      <string>Options</string>
     </property>
+    <widget class="QMenu" name="menu_language">
+     <property name="title">
+      <string>Language</string>
+     </property>
+    </widget>
     <addaction name="act_select_on_click"/>
+    <addaction name="act_unlock_locked"/>
+    <addaction name="menu_language"/>
    </widget>
    <widget class="QMenu" name="menu_tools">
     <property name="title">
@@ -150,6 +170,20 @@
    </property>
    <property name="text">
     <string>Select Node on Row Click</string>
+   </property>
+  </action>
+  <action name="act_unlock_locked">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Unlock Locked Driven on Apply</string>
+   </property>
+   <property name="toolTip">
+    <string>Unlock the locked driven attributes while applying, and lock them again afterwards</string>
    </property>
   </action>
   <action name="act_export_driven_keys">

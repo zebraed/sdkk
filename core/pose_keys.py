@@ -24,7 +24,7 @@ class KeyStatus(Enum):
         self.label = label
         self.button_text = button_text
 
-    def describe(self, keyed, total, with_count=True):
+    def describe(self, keyed, total, with_count=True, translate=None):
         """Build the status text such as "Keyed 5 / 8".
 
         "Keyed 5 / 8"のような状態の文字列を作る
@@ -34,11 +34,16 @@ class KeyStatus(Enum):
             total (int): 対象のアトリビュートの数
             with_count (bool): 全アトリビュートにキーがある場合も数を付けるか
                 一部だけにキーがある場合は常に付ける
+            translate (Optional[Callable[[str], str]]): 状態の名前（"No Key"など）を翻訳する関数。Noneは英語のまま
 
         Returns:
             str: 状態の文字列
         """
-        text = f"{self.glyph} {self.label}"
+        label = self.label
+        if translate is not None:
+            label = translate(label)
+
+        text = f"{self.glyph} {label}"
         if self is KeyStatus.PARTIAL or (with_count and self is KeyStatus.FULL):
             text += f" {keyed} / {total}"
 

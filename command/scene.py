@@ -229,6 +229,25 @@ def list_driver_values(driver, driven):
     return tuple(sorted(values))
 
 
+def evaluate_curve(curve, driver_value):
+    """Evaluate a driven key curve at a driver value.
+
+    ドリブンキーのカーブを、ドライバー値で評価する
+
+    Args:
+        curve (str): animCurveノード名
+        driver_value (float): 評価するドライバー値
+
+    Returns:
+        Optional[float]: カーブの値。キーがなければNone
+    """
+    values = cmds.keyframe(curve, q=True, eval=True, float=(driver_value,))
+    if not values:
+        return None
+
+    return values[0]
+
+
 def list_driver_attrs(node):
     """List the attributes of a node that already drive driven keys.
 

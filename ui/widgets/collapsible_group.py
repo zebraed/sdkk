@@ -61,6 +61,28 @@ class CollapsibleGroup(QtWidgets.QWidget):
 
         self.toggled.emit(expanded)
 
+    def title(self):
+        """Return the text of the header.
+
+        見出しのテキストを返す
+
+        Returns:
+            str: 見出し
+        """
+        return self._header.text()
+
+    def setTitle(self, title):  # pylint: disable=invalid-name
+        """Set the text of the header.
+
+        見出しのテキストを設定する
+
+        QGroupBoxと同じ名前にしている。translate.bindが、getterとsetterを名前から引くため
+
+        Args:
+            title (str): 見出し
+        """
+        self._header.setText(title)
+
     def set_summary(self, text):
         """Set the text shown after the title.
 

@@ -9,8 +9,9 @@ from typing import Optional
 
 from maya import cmds
 
-from .command import drivenkey, scene
+from .command import animation, drivenkey, scene
 from .core.history import HistoryEntry, parse_history
+from .i18n import tr
 from .core.model import Plug
 from .core.pose_keys import PoseSummary, summarize_pose_keys
 from .core.setup_state import TRANSFORM_ATTRS, DriverSpec, SetupState
@@ -18,6 +19,7 @@ from .core.state import Side, Status
 
 SETTINGS_KEY = "sdkk_window_settings"
 HISTORY_KEY = "sdkk_history"
+POSE_TOLERANCE = 1e-4
 
 
 @dataclass(frozen=True)
@@ -110,6 +112,7 @@ class SetupSnapshot:
         driven_state (dict[tuple[str, str], str]): ドリブンキーで動いているアトリビュートの種類
             "driver"は現在のドライバーのキー、"other"は別のドライバーのキー。動いていなければ含まない
         driver_attrs (tuple[str, ...]): ドライバーのノードで、すでにドリブンキーを動かしているアトリビュート
+        pose_modified (bool): key_plugsのドリブンの現在値が、現在のドライバー値でのカーブの値と違うか
     """
 
     nodes: dict
@@ -122,6 +125,7 @@ class SetupSnapshot:
     warnings: tuple
     driven_state: dict
     driver_attrs: tuple
+    pose_modified: bool = False
 
 
 @dataclass(frozen=True)
@@ -134,11 +138,13 @@ class SetupInput:
         kind (str): "none"、"driver"、"other"、または"foreign"
         curve (Optional[str]): 現在のドライバーのanimCurve。なければNone
         key_values (tuple[float, ...]): 現在のドライバーのキー値
+        direct (bool): カーブがblendWeightedを経由せず、ドリブンの値をそのカーブだけで決めるか
     """
 
     kind: str
     curve: Optional[str] = None
     key_values: tuple = ()
+    direct: bool = False
 
 
 @dataclass(frozen=True)
@@ -232,6 +238,7 @@ class SetupSceneReader:
             warnings=index.warnings,
             driven_state=index.driven_state,
             driver_attrs=index.driver_attrs,
+            pose_modified=_is_pose_modified(index, values, driver_value),
         )
 
     def refresh_keys(self):
@@ -266,6 +273,23 @@ class SetupSceneReader:
             plug_keys=plug_keys,
         )
         return self.read_values()
+
+
+def _is_pose_modified(index, values, driver_value):
+    if index.driver_plug is None or driver_value is None:
+        return False
+
+    for key, plug in index.enabled_plugs.items():
+        item = index.inputs.get(key)
+        if plug not in index.key_plugs or item is None or not item.direct:
+            continue
+
+        expected = scene.evaluate_curve(item.curve, driver_value)
+        current = values[key]
+        if expected is not None and current is not None and abs(current - expected) > POSE_TOLERANCE:
+            return True
+
+    return False
 
 
 def read_snapshot(state, detail_uuid=None, target_uuids=()):
@@ -353,17 +377,17 @@ def _build_setup_index(state, detail_uuid, target_uuids):
         uuid, attr = key
         info = nodes.get(uuid)
         if info is None:
-            blocked[key] = "Node not found"
+            blocked[key] = tr("Node not found")
             continue
 
         plug = f"{info.name}.{attr}"
         if not cmds.objExists(plug):
-            blocked[key] = f"{info.short_name}.{attr} not found"
+            blocked[key] = tr("{plug} not found", plug=f"{info.short_name}.{attr}")
             continue
 
         value_plugs[key] = plug
         if cmds.getAttr(plug, l=True):
-            blocked[key] = f"{info.short_name}.{attr} is locked"
+            blocked[key] = tr("{plug} is locked", plug=f"{info.short_name}.{attr}")
             continue
 
         plugs[key] = plug
@@ -380,7 +404,8 @@ def _build_setup_index(state, detail_uuid, target_uuids):
         if current is not None:
             values = cmds.keyframe(current.curve, q=True, fc=True)
             key_values = () if values is None else tuple(sorted(values))
-            inputs[key] = SetupInput("driver", current.curve, key_values)
+            direct = current.route is not None and not current.route.get_blend_data()
+            inputs[key] = SetupInput("driver", current.curve, key_values, direct)
             driven_state[key] = "driver"
         elif keys:
             inputs[key] = SetupInput("other")
@@ -388,8 +413,8 @@ def _build_setup_index(state, detail_uuid, target_uuids):
         elif has_input:
             inputs[key] = SetupInput("foreign")
             info = nodes[key[0]]
-            blocked[key] = (
-                f"{info.short_name}.{key[1]} has an incoming connection"
+            blocked[key] = tr(
+                "{plug} has an incoming connection", plug=f"{info.short_name}.{key[1]}",
             )
             plugs.pop(key)
         else:
@@ -424,6 +449,45 @@ def _build_setup_index(state, detail_uuid, target_uuids):
         driven_state=driven_state,
         driver_attrs=tuple(driver_attrs),
     )
+
+
+def list_locked_plugs(plugs):
+    """List the plugs that are locked.
+
+    ロックされているアトリビュートを列挙する
+
+    Args:
+        plugs (Iterable[str]): アトリビュート
+
+    Returns:
+        set[str]: ロックされているアトリビュート。存在しないものは含まない
+    """
+    locked = set()
+    for plug in plugs:
+        if cmds.objExists(plug) and cmds.getAttr(plug, l=True):
+            locked.add(plug)
+
+    return locked
+
+
+def read_plug_values(plugs):
+    """Read the current values of the plugs.
+
+    アトリビュートの現在値を読む
+
+    Args:
+        plugs (Iterable[str]): アトリビュート
+
+    Returns:
+        dict[str, float]: アトリビュートごとの値。読めないものは含まない
+    """
+    values = {}
+    for plug in plugs:
+        value = scene.read_value(plug)
+        if value is not None:
+            values[plug] = value
+
+    return values
 
 
 def get_selected_nodes():
@@ -610,6 +674,25 @@ def plan_driven_keys(driven_keys, policy, unlock):
     return drivenkey.plan_driven_keys(driven_keys, policy, unlock)
 
 
+def plan_conversion(driven_keys, policy, unlock):
+    """Check whether animation read as driven keys can be converted. The scene is not changed.
+
+    アニメーションから読んだドリブンキーを、変換できるかを調べる。シーンは変更しない
+    変換は、元のアニメーションを外してから適用するため、その入力は差し支えないものとして調べる
+
+    Args:
+        driven_keys (Iterable[DrivenKeyData]): read_animation_sourcesで読んだドリブンキー
+        policy (ConflictPolicy): 同じドライバーとドリブンの組がすでにある場合の扱い
+        unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
+
+    Returns:
+        list[PlanItem]: driven_keysと同じ順の計画
+    """
+    return drivenkey.plan_driven_keys(
+        driven_keys, policy, unlock, animation.TIME_CURVE_TYPES,
+    )
+
+
 def list_mirror_sources(side, selected_only):
     """List the driven keys that can be mirrored, read from the scene.
 
@@ -654,6 +737,52 @@ def check_mirror(source, rule):
         return None
 
     return items[0]
+
+
+@dataclass(frozen=True)
+class AnimationSource:
+    """An animated attribute read as a driven key of a driver.
+
+    アニメーション付きアトリビュートを、ドライバーのドリブンキーとして読んだ結果
+
+    Attributes:
+        plug (str): ドリブンアトリビュート
+        data (Optional[DrivenKeyData]): 読み取ったドリブンキー。読み取れなければNone
+        error (str): 読み取れなかった理由。読み取れた場合は空
+    """
+
+    plug: str
+    data: object = None
+    error: str = ""
+
+
+def read_animation_sources(driver_plug, node_names):
+    """Read the timeline animation of the nodes as driven keys of the driver.
+
+    ノードのタイムラインアニメーションを、ドライバーのドリブンキーとして読む
+    シーンは変更しない
+
+    Args:
+        driver_plug (str): ドライバーアトリビュート
+        node_names (Iterable[str]): アニメーションを探す起点のノード
+
+    Returns:
+        list[AnimationSource]: アニメーションのあるアトリビュート。ドライバー自身は含まない
+    """
+    sources = []
+    for plug in animation.list_animated_plugs(node_names):
+        if plug == driver_plug:
+            continue
+
+        try:
+            data = animation.read_animation_as_driven_key(driver_plug, plug)
+        except ValueError as exc:
+            sources.append(AnimationSource(plug, None, str(exc)))
+            continue
+
+        sources.append(AnimationSource(plug, data))
+
+    return sources
 
 
 def list_node_names(uuids):

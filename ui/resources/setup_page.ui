@@ -1847,7 +1847,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="horizontalLayout_key_info">
+       <layout class="QHBoxLayout" name="horizontalLayout_key_info" stretch="1,0,1">
         <property name="leftMargin">
          <number>0</number>
         </property>
@@ -1871,20 +1871,20 @@
          </widget>
         </item>
         <item>
-         <spacer name="spacer_key_info">
-          <property name="orientation">
-           <enum>Qt::Horizontal</enum>
+         <widget class="QCheckBox" name="check_driven_edit">
+          <property name="toolTip">
+           <string>The slider and the presets move only the driver. The driven keep their current pose, to be keyed at the new driver value</string>
           </property>
-          <property name="sizeHint" stdset="0">
-           <size>
-            <width>20</width>
-            <height>20</height>
-           </size>
+          <property name="text">
+           <string>Driven Edit</string>
           </property>
-         </spacer>
+         </widget>
         </item>
         <item>
          <widget class="QLabel" name="label_key_status">
+          <property name="alignment">
+           <set>Qt::AlignRight|Qt::AlignVCenter</set>
+          </property>
           <property name="text">
            <string>○ No Key</string>
           </property>

@@ -438,6 +438,88 @@ def remove_key(driver, driven, driver_value, tolerance=1e-6):
     return False
 
 
+@dataclass(frozen=True)
+class KeyMovePlan:
+    """A validated move of one key on an animCurve.
+
+    animCurve上の1キーについて検証済みの移動
+
+    Attributes:
+        curve (str): 移動するキーを持つanimCurveノード名
+        index (int): 移動するキーのインデックス
+        new_value (float): 移動先のドライバー値
+    """
+
+    curve: str
+    index: int
+    new_value: float
+
+
+def plan_key_move(
+    driver, driven, driver_value, new_value, tolerance=1e-6,
+):
+    """Validate and plan moving one key without changing the scene.
+
+    シーンを変更せず、1キーの移動を検証して計画する
+
+    Args:
+        driver (str): ドライバーアトリビュート
+        driven (str): ドリブンアトリビュート
+        driver_value (float): 動かすキーのドライバー値
+        new_value (float): 動かし先のドライバー値
+        tolerance (float): 同じ値とみなす絶対誤差
+
+    Returns:
+        Optional[KeyMovePlan]: 検証済みの移動。ドリブンキーまたは対象キーがなければNone
+
+    Raises:
+        ValueError: 隣のキーと同じ位置、またはその先へ動かそうとした場合
+    """
+    key = find_driven_key(driver, driven)
+    if key is None:
+        return None
+
+    values = cmds.keyframe(key.curve, q=True, fc=True)
+    if values is None:
+        return None
+
+    indices = [
+        index
+        for index, value in enumerate(values)
+        if math.isclose(value, driver_value, abs_tol=tolerance)
+    ]
+    if not indices:
+        return None
+
+    index = indices[0]
+    crosses_previous = index > 0 and new_value <= values[index - 1]
+    crosses_next = index < len(values) - 1 and new_value >= values[index + 1]
+    if crosses_previous or crosses_next:
+        raise ValueError(
+            f"Cannot move the key at {driver_value} to {new_value} on "
+            f"{key.curve}: it would reach a neighbouring key",
+        )
+
+    return KeyMovePlan(key.curve, index, new_value)
+
+
+def apply_key_move(plan):
+    """Apply one validated key move.
+
+    検証済みの1キーの移動を適用する
+
+    Args:
+        plan (KeyMovePlan): 適用する移動
+    """
+    cmds.keyframe(
+        plan.curve,
+        index=(plan.index, plan.index),
+        e=True,
+        a=True,
+        fc=plan.new_value,
+    )
+
+
 def move_key(driver, driven, driver_value, new_value, tolerance=1e-6):
     """Move the key at the given driver value to another driver value.
 
@@ -461,32 +543,13 @@ def move_key(driver, driven, driver_value, new_value, tolerance=1e-6):
     Raises:
         ValueError: 隣のキーと同じ位置、またはその先へ動かそうとした場合
     """
-    key = find_driven_key(driver, driven)
-    if key is None:
+    plan = plan_key_move(
+        driver, driven, driver_value, new_value, tolerance,
+    )
+    if plan is None:
         return False
 
-    values = cmds.keyframe(key.curve, q=True, fc=True)
-    if values is None:
-        return False
-
-    indices = [
-        index
-        for index, value in enumerate(values)
-        if math.isclose(value, driver_value, abs_tol=tolerance)
-    ]
-    if not indices:
-        return False
-
-    index = indices[0]
-    crosses_previous = index > 0 and new_value <= values[index - 1]
-    crosses_next = index < len(values) - 1 and new_value >= values[index + 1]
-    if crosses_previous or crosses_next:
-        raise ValueError(
-            f"Cannot move the key at {driver_value} to {new_value} on "
-            f"{key.curve}: it would reach a neighbouring key",
-        )
-
-    cmds.keyframe(key.curve, index=(index, index), e=True, a=True, fc=new_value)
+    apply_key_move(plan)
     return True
 
 
@@ -522,7 +585,9 @@ def rename_driven_key(key, name=None):
     return replace(key, curve=cmds.rename(key.curve, name))
 
 
-def plan_driven_keys(driven_keys, policy=ConflictPolicy.REPLACE, unlock=False):
+def plan_driven_keys(
+    driven_keys, policy=ConflictPolicy.REPLACE, unlock=False, allowed_inputs=(),
+):
     """Check whether DrivenKeyData can be applied, and build a plan.
 
     DrivenKeyDataをシーンへ適用できるかを調べる。シーンは変更しない
@@ -531,11 +596,16 @@ def plan_driven_keys(driven_keys, policy=ConflictPolicy.REPLACE, unlock=False):
         driven_keys (Iterable[DrivenKeyData]): 適用するデータ
         policy (ConflictPolicy): 同じドライバーとドリブンの組がすでにある場合の扱い
         unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
+        allowed_inputs (Sequence[str]): ドリブンキー以外で、入力にあっても差し支えないノード型
+            適用前に外すアニメーションのanimCurveを、あらかじめ許す場合に使う
 
     Returns:
         list[PlanItem]: PlanItemのリスト
     """
-    return [_plan_driven_key(data, policy, unlock) for data in driven_keys]
+    return [
+        _plan_driven_key(data, policy, unlock, allowed_inputs)
+        for data in driven_keys
+    ]
 
 
 def apply_plan(items, linear_unit=None, angle_unit=None):
@@ -838,7 +908,7 @@ def _resolve_route(curve):
     return BlendRoute(str(destination), tuple(hops)), Status.OK
 
 
-def _plan_driven_key(data, policy, unlock):
+def _plan_driven_key(data, policy, unlock, allowed_inputs=()):
     for plug in (data.driver, data.driven):
         matches = cmds.ls(plug.node)
         if not matches:
@@ -876,7 +946,7 @@ def _plan_driven_key(data, policy, unlock):
 
     existing = find_driven_key(driver, driven)
     if existing is None:
-        if has_foreign_input(driven):
+        if has_foreign_input(driven, allowed_inputs):
             return PlanItem(
                 data,
                 PlanStatus.FOREIGN_INPUT,
@@ -1185,19 +1255,20 @@ def _set_attr_value(plug, value):
         cmds.setAttr(plug, value)
 
 
-def has_foreign_input(plug):
+def has_foreign_input(plug, allowed=()):
     """Return whether the attribute has an input other than a driven key.
 
     アトリビュートに、ドリブンキー以外の入力があるかを返す
 
     Args:
         plug (str): アトリビュート
+        allowed (Sequence[str]): ドリブンキーのほかに、入力にあっても差し支えないノード型
 
     Returns:
-        bool: animCurveとblendWeighted以外から接続されている場合はTrue
+        bool: animCurveとblendWeighted、allowed以外から接続されている場合はTrue
     """
     sources = cmds.listConnections(plug, s=True, d=False, scn=True)
     if sources is None:
         return False
 
-    return cmds.nodeType(sources[0]) not in CURVE_TYPES + ("blendWeighted",)
+    return cmds.nodeType(sources[0]) not in CURVE_TYPES + ("blendWeighted",) + tuple(allowed)

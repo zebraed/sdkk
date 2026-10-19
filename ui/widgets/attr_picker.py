@@ -5,6 +5,9 @@ Attribute picker: a button that opens a searchable popup list.
 """
 from Qt import QtCore, QtGui, QtWidgets
 
+from ...i18n import tr
+from .. import translate
+
 
 class AttrPicker(QtWidgets.QPushButton):
     """Opens a popup with a search field above a filtered list of attributes.
@@ -27,7 +30,7 @@ class AttrPicker(QtWidgets.QPushButton):
         self._provider = None
         self._popup = None
         self._placeholder = "Search / Select Attribute..."
-        self.setText(self._placeholder)
+        translate.bind(self, "setText", self._placeholder)
         self.setStyleSheet("text-align: left; padding-left: 6px;")
         self.clicked.connect(self._open_popup)
 
@@ -48,7 +51,7 @@ class AttrPicker(QtWidgets.QPushButton):
             text (str): 未選択のときの表示
         """
         self._placeholder = text
-        self.setText(text)
+        translate.bind(self, "setText", text)
 
     def set_picked(self, attr):
         """Show the picked attribute on the button.
@@ -56,7 +59,10 @@ class AttrPicker(QtWidgets.QPushButton):
         Args:
             attr (Optional[str]): 選択中のアトリビュート。Noneは未選択の表示に戻す
         """
-        self.setText(self._placeholder if attr is None else attr)
+        if attr is None:
+            translate.bind(self, "setText", self._placeholder)
+        else:
+            self.setText(attr)
 
     def _open_popup(self):
         candidates = [] if self._provider is None else list(self._provider())
@@ -80,7 +86,7 @@ class _AttrPopup(QtWidgets.QFrame):
 
         self._line = QtWidgets.QLineEdit()
         self._line.setObjectName("line_attr_search")
-        self._line.setPlaceholderText("Search...")
+        self._line.setPlaceholderText(tr("Search..."))
         self._line.setClearButtonEnabled(True)
 
         self._source = QtGui.QStandardItemModel(self)
@@ -88,7 +94,7 @@ class _AttrPopup(QtWidgets.QFrame):
             self._source.appendRow(QtGui.QStandardItem(name))
 
         if not candidates:
-            item = QtGui.QStandardItem("No candidate attributes")
+            item = QtGui.QStandardItem(tr("No candidate attributes"))
             item.setEnabled(False)
             self._source.appendRow(item)
 

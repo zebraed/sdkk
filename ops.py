@@ -326,7 +326,7 @@ def move_driven_keys(driver, driven_plugs, driver_value, new_value):
 
     Raises:
         ValueError: 隣のキーと同じ位置、またはその先へ動かそうとしたアトリビュートがある場合
-            それまでに動かした分は、同じUndoで戻せる
+            この場合はどのキーも変更しない
 
     Examples:
         >>> import sdkk
@@ -338,13 +338,22 @@ def move_driven_keys(driver, driven_plugs, driver_value, new_value):
         ... )
         ['lip_L_jnt.translateY', 'lip_R_jnt.translateY']
     """
-    moved = [
-        driven
-        for driven in driven_plugs
-        if drivenkey.move_key(
-            driver, driven, driver_value, new_value, DEFAULT_TOLERANCE,
+    plans = []
+    for driven in dict.fromkeys(driven_plugs):
+        plan = drivenkey.plan_key_move(
+            driver,
+            driven,
+            driver_value,
+            new_value,
+            DEFAULT_TOLERANCE,
         )
-    ]
+        if plan is not None:
+            plans.append((driven, plan))
+
+    for _, plan in plans:
+        drivenkey.apply_key_move(plan)
+
+    moved = [driven for driven, _ in plans]
     logger.info(
         "Moved the keys at %s to %s on %d attribute(s) driven by %s",
         driver_value,

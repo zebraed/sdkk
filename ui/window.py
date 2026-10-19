@@ -13,9 +13,13 @@ from .. import (
     __license__,
     __status__,
     __version__,
+    i18n,
     ops,
     service,
 )
+from ..i18n import tr
+from . import translate
+from .advanced_page import AdvancedPage
 from .command_print import format_call, print_commands
 from .manage_dialog import ManageDialog
 from .manage_page import ManagePage
@@ -46,7 +50,13 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
     def __init__(self, parent):
         super().__init__(parent)
+        settings = service.read_settings()
+        language = settings.get("language")
+        if language in i18n.LANGUAGES:
+            translate.set_language(language)
+
         QtCompat.loadUi(os.path.join(RESOURCE_DIR, "main.ui"), self)
+        translate.bind_ui(self)
         self.setObjectName(self.object_name)
         self.setWindowIcon(make_window_icon(os.path.join(RESOURCE_DIR, "sdkk.svg")))
         self.setWindowFlags(QtCore.Qt.Window)
@@ -61,17 +71,21 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         self._file_dir = None
         self._options = {
             "select_on_click": self.findChild(QtWidgets.QAction, "act_select_on_click"),
+            "unlock_locked": self.findChild(QtWidgets.QAction, "act_unlock_locked"),
         }
         self._page = SetupPage(self._options["select_on_click"])
         self.findChild(QtWidgets.QWidget, "tab_setup").layout().addWidget(self._page)
         self._page.statusChanged.connect(self._on_status_changed)
-        self._manage = ManagePage(self._options["select_on_click"])
+        self._manage = ManagePage(self._options["select_on_click"], self._options["unlock_locked"])
         self.findChild(QtWidgets.QWidget, "tab_manage").layout().addWidget(self._manage)
         self._connect_manage_page(self._manage, self)
         self._manage_dialogs = {}
-        self._mirror = MirrorPage()
+        self._mirror = MirrorPage(self._options["unlock_locked"])
         self.findChild(QtWidgets.QWidget, "tab_mirror").layout().addWidget(self._mirror)
         self._mirror.messageChanged.connect(self._on_manage_message)
+        self._advanced = AdvancedPage(self._page.get_conversion_source, self._options["unlock_locked"])
+        self.findChild(QtWidgets.QWidget, "tab_advanced").layout().addWidget(self._advanced)
+        self._advanced.messageChanged.connect(self._on_manage_message)
         self._menu_history = self.findChild(QtWidgets.QMenu, "menu_history")
         self._menu_history.aboutToShow.connect(self._build_history_menu)
         export_action = self.findChild(QtWidgets.QAction, "act_export_driven_keys")
@@ -80,6 +94,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         import_action.triggered.connect(functools.partial(self._show_manage_dialog, "import"))
         about_action = self.findChild(QtWidgets.QAction, "act_about")
         about_action.triggered.connect(self._on_about)
+        self._build_language_menu()
         pose_area = self._page.detach_pose_area()
         pose_area.layout().setContentsMargins(6, 0, 6, 6)
         self.findChild(QtWidgets.QVBoxLayout, "verticalLayout_main").addWidget(pose_area)
@@ -89,7 +104,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         with open(os.path.join(RESOURCE_DIR, "style.qss"), encoding="utf-8") as stream:
             self.setStyleSheet(stream.read())
 
-        self._apply_settings(service.read_settings())
+        self._apply_settings(settings)
 
     def closeEvent(self, event):
         service.write_settings(self._gather_settings())
@@ -100,16 +115,22 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         self._page.shutdown()
         self._manage.shutdown()
         self._mirror.shutdown()
+        self._advanced.shutdown()
         super().closeEvent(event)
 
     def _gather_settings(self):
         geometry = self.saveGeometry().toBase64().data().decode("ascii")
-        settings = {"geometry": geometry, "file_dialog_dir": self._file_dir}
+        settings = {
+            "geometry": geometry,
+            "file_dialog_dir": self._file_dir,
+            "language": i18n.get_language(),
+        }
         for key, action in self._options.items():
             settings[key] = action.isChecked()
 
         settings.update(self._page.gather_settings())
         settings.update(self._mirror.gather_settings())
+        settings.update(self._advanced.gather_settings())
         return settings
 
     def _apply_settings(self, settings):
@@ -128,19 +149,34 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
         self._page.apply_settings(settings)
         self._mirror.apply_settings(settings)
+        self._advanced.apply_settings(settings)
+
+    def _build_language_menu(self):
+        menu = self.findChild(QtWidgets.QMenu, "menu_language")
+        group = QtWidgets.QActionGroup(self)
+        group.setExclusive(True)
+        for code, name in i18n.LANGUAGES.items():
+            action = menu.addAction(name)
+            action.setCheckable(True)
+            action.setChecked(code == i18n.get_language())
+            action.triggered.connect(functools.partial(self._on_language_picked, code))
+            group.addAction(action)
+
+    def _on_language_picked(self, code, _checked=False):
+        translate.set_language(code)
 
     def _build_history_menu(self):
         self._menu_history.clear()
         entries = self._page.list_history()
         if not entries:
-            self._menu_history.addAction("(empty)").setEnabled(False)
+            self._menu_history.addAction(tr("(empty)")).setEnabled(False)
 
         for entry in entries:
             action = self._menu_history.addAction(entry.label)
             action.triggered.connect(functools.partial(self._on_history_picked, entry))
 
         self._menu_history.addSeparator()
-        clear = self._menu_history.addAction("Clear History")
+        clear = self._menu_history.addAction(tr("Clear History"))
         clear.setEnabled(bool(entries))
         clear.triggered.connect(self._on_history_cleared)
 
@@ -154,13 +190,13 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         lines = [
             f"sdkk  v{__version__}",
             "",
-            f"Author: {__author__}",
-            f"Email: {__email__}",
-            f"Copyright: {__copyright__}",
-            f"License: {__license__}",
-            f"Status: {__status__}",
+            tr("Author: {value}", value=__author__),
+            tr("Email: {value}", value=__email__),
+            tr("Copyright: {value}", value=__copyright__),
+            tr("License: {value}", value=__license__),
+            tr("Status: {value}", value=__status__),
         ]
-        QtWidgets.QMessageBox.about(self, "About sdkk", "\n".join(lines))
+        QtWidgets.QMessageBox.about(self, tr("About sdkk"), "\n".join(lines))
 
     def _connect_manage_page(self, page, file_dialog_parent):
         page.exportRequested.connect(
@@ -175,7 +211,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         dialog = self._manage_dialogs.get(section)
         if dialog is None:
             dialog = ManageDialog(
-                section, self._options["select_on_click"], self,
+                section, self._options["select_on_click"], self._options["unlock_locked"], self,
             )
             self._connect_manage_page(dialog.page, dialog)
             dialog.finished.connect(
@@ -198,7 +234,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
     def _on_open_import_file(self, page, file_dialog_parent):
         path = self._pick_json_path(
-            "Open Driven Key File", save=False, parent=file_dialog_parent,
+            tr("Open Driven Key File"), save=False, parent=file_dialog_parent,
         )
         if path is None:
             return
@@ -207,11 +243,11 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             page.load_file(path)
         except (OSError, ValueError) as exc:
             page.messageChanged.emit(
-                f"⚠ Cannot read driven keys from {path}: {exc}", True,
+                "⚠ " + tr("Cannot read driven keys from {path}: {exc}", path=path, exc=exc), True,
             )
             return
 
-        page.messageChanged.emit(f"Loaded driven keys from {path}", False)
+        page.messageChanged.emit(tr("Loaded driven keys from {path}", path=path), False)
 
     def _on_manage_message(self, text, warning):
         if warning:
@@ -221,7 +257,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
     def _export_driven_keys(self, page, file_dialog_parent, nodes, side):
         path = self._pick_json_path(
-            "Export Driven Key", save=True, parent=file_dialog_parent,
+            tr("Export Driven Key"), save=True, parent=file_dialog_parent,
         )
         if path is None:
             return
@@ -230,7 +266,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             ops.export_driven_keys(path, nodes, side)
         except (OSError, ValueError, RuntimeError) as exc:
             page.messageChanged.emit(
-                f"⚠ Cannot export driven keys to {path}: {exc}", True,
+                "⚠ " + tr("Cannot export driven keys to {path}: {exc}", path=path, exc=exc), True,
             )
             return
 
@@ -240,7 +276,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             kwargs["side"] = side
 
         print_commands(format_call("export_driven_keys", kwargs))
-        page.messageChanged.emit(f"Exported driven keys to {path}", False)
+        page.messageChanged.emit(tr("Exported driven keys to {path}", path=path), False)
 
     def _pick_json_path(self, caption, save, parent=None):
         directory = self._file_dir

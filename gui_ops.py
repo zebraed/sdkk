@@ -8,7 +8,7 @@ from maya import cmds
 from .maya_utils import suspend_undo
 
 
-def preview_driver_value(driver, value):
+def preview_driver_value(driver, value, held=None):
     """Move the driver to a value without recording undo, such as while dragging a slider.
 
     スライダーのドラッグ中など、Undoに積まずにドライバーを指定の値へ動かす
@@ -16,15 +16,18 @@ def preview_driver_value(driver, value):
     Args:
         driver (str): ドライバーアトリビュート
         value (float): 設定する値
+        held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
+            ドリブンキーに従って動いてしまうドリブンのポーズを保つために使う
 
     Raises:
         RuntimeError: ロックされている、または入力があって設定できない場合
     """
     with suspend_undo():
         cmds.setAttr(driver, value)
+        _restore_values(held)
 
 
-def commit_driver_value(driver, start_value, value):
+def commit_driver_value(driver, start_value, value, held=None):
     """Leave one undo step for the driver moved with preview_driver_value.
 
     preview_driver_valueで動かしたドライバーについて、1回分のUndoを残す
@@ -33,16 +36,18 @@ def commit_driver_value(driver, start_value, value):
         driver (str): ドライバーアトリビュート
         start_value (float): 動かし始める前の値
         value (float): 最終的な値
+        held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
 
     Raises:
         RuntimeError: ロックされている、または入力があって設定できない場合
     """
-    preview_driver_value(driver, start_value)
+    preview_driver_value(driver, start_value, held)
     if value != start_value:
         cmds.setAttr(driver, value)
+        _restore_values(held)
 
 
-def apply_driver_preset(driver, value):
+def apply_driver_preset(driver, value, held=None):
     """Apply a driver preset. 0 resets the driver to 0, and any other value is added to the current value.
 
     ドライバーのプリセットを適用する。0はドライバーを0に戻し、それ以外は現在の値に加える
@@ -55,9 +60,19 @@ def apply_driver_preset(driver, value):
     Args:
         driver (str): ドライバーアトリビュート
         value (float): プリセットの値。0以外は、現在の値に加える量（負なら減らす）
+        held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
 
     Raises:
         RuntimeError: ロックされている、または入力があって設定できない場合
     """
     target = 0.0 if value == 0 else cmds.getAttr(driver) + value
     cmds.setAttr(driver, target)
+    _restore_values(held)
+
+
+def _restore_values(held):
+    if held is None:
+        return
+
+    for plug, value in held.items():
+        cmds.setAttr(plug, value)

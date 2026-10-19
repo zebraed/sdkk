@@ -5,6 +5,8 @@ Pose strip: the driver values that have keys, drawn as markers on one line.
 """
 from Qt import QtCore, QtGui, QtWidgets
 
+from ...i18n import tr
+
 from ...core.pose_keys import (
     DEFAULT_TOLERANCE,
     locate_on_single_mark,
@@ -325,7 +327,7 @@ class PoseStripWidget(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         if not self._marks:
             painter.setPen(QtGui.QColor("#8a8a8a"))
-            painter.drawText(self.rect(), QtCore.Qt.AlignCenter, "No keys on the driver")
+            painter.drawText(self.rect(), QtCore.Qt.AlignCenter, tr("No keys on the driver"))
             return
 
         values, fractions, xs = self._layout_marks()
@@ -400,5 +402,6 @@ class PoseStripWidget(QtWidgets.QWidget):
             QtCore.QPointF(x + 5, top + 9),
         ]))
         painter.setPen(QtGui.QColor("#f5a623"))
-        width = painter.fontMetrics().horizontalAdvance("Current")
-        painter.drawText(QtCore.QPointF(x - width / 2, top + 22), "Current")
+        text = tr("Current")
+        width = painter.fontMetrics().horizontalAdvance(text)
+        painter.drawText(QtCore.QPointF(x - width / 2, top + 22), text)

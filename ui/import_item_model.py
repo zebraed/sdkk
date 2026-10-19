@@ -5,10 +5,14 @@ Table model of the import items: one driven key read from a file.
 """
 from Qt import QtCore
 
+from ..i18n import tr
+from .translate import TranslatedTableModel
+
 COLUMNS = ("Driver", "Driven", "Status")
+LOCKED_TIP = "The attribute is locked. It is unlocked while applying, and locked again afterwards"
 
 
-class ImportItemModel(QtCore.QAbstractTableModel):
+class ImportItemModel(TranslatedTableModel):
     """Shows the PlanItems of a file with a check box on each. It only displays; the page plans them.
 
     ファイルの計画の項目を、チェックボックス付きで表示する
@@ -18,8 +22,9 @@ class ImportItemModel(QtCore.QAbstractTableModel):
         super().__init__(parent)
         self._items = []
         self._checked = []
+        self._locked = frozenset()
 
-    def set_items(self, items, keep_checked):
+    def set_items(self, items, keep_checked, locked=frozenset()):
         """Replace the rows.
 
         行を置き換える
@@ -28,6 +33,7 @@ class ImportItemModel(QtCore.QAbstractTableModel):
             items (Sequence[PlanItem]): 表示する計画の項目
             keep_checked (bool): 行数が同じなら、チェックを今のまま残すか
                 Falseや行数が違う場合は、適用できる項目だけにチェックを入れる
+            locked (Collection[str]): ロックされているドリブンアトリビュート。適用中だけ解除することを示す
         """
         items = list(items)
         checked = self._checked
@@ -37,6 +43,7 @@ class ImportItemModel(QtCore.QAbstractTableModel):
         self.beginResetModel()
         self._items = items
         self._checked = checked
+        self._locked = frozenset(locked)
         self.endResetModel()
 
     def list_checked_items(self):
@@ -116,7 +123,7 @@ class ImportItemModel(QtCore.QAbstractTableModel):
 
     def headerData(self, section, orientation, role=QtCore.Qt.DisplayRole):
         if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
-            return COLUMNS[section]
+            return tr(COLUMNS[section])
 
         return None
 
@@ -126,11 +133,12 @@ class ImportItemModel(QtCore.QAbstractTableModel):
 
         item = self._items[index.row()]
         column = index.column()
+        locked = str(item.data.driven) in self._locked
         if role == QtCore.Qt.DisplayRole:
-            return _format_cell(item, column)
+            return _format_cell(item, column, locked)
 
         if role == QtCore.Qt.ToolTipRole:
-            return _format_tip(item, column)
+            return _format_tip(item, column, locked)
 
         if role == QtCore.Qt.CheckStateRole and column == 0:
             if self._checked[index.row()]:
@@ -141,7 +149,7 @@ class ImportItemModel(QtCore.QAbstractTableModel):
         return None
 
 
-def _format_cell(item, column):
+def _format_cell(item, column, locked):
     if column == 0:
         plug = item.data.driver
         return f"{plug.node.rpartition('|')[2]}.{plug.attr}"
@@ -150,14 +158,21 @@ def _format_cell(item, column):
         plug = item.data.driven
         return f"{plug.node.rpartition('|')[2]}.{plug.attr}"
 
-    return item.status.value
+    if locked:
+        return f"{tr(item.status.value)} ({tr('locked')})"
+
+    return tr(item.status.value)
 
 
-def _format_tip(item, column):
+def _format_tip(item, column, locked):
     if column == 0:
         return f"{item.data.driver.node}.{item.data.driver.attr}"
 
     if column == 1:
         return f"{item.data.driven.node}.{item.data.driven.attr}"
 
-    return item.message
+    lines = [tr(item.message)]
+    if locked:
+        lines.append(tr(LOCKED_TIP))
+
+    return "\n".join(line for line in lines if line)
