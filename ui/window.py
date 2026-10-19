@@ -17,10 +17,12 @@ from .. import (
     ops,
     service,
 )
+from ..core.state import Role
 from ..i18n import tr
 from . import translate
 from .advanced_page import AdvancedPage
-from .command_print import format_call, print_commands
+from .command_print import format_call, print_commands, shorten_names
+from .confirm_dialog import ConfirmListDialog
 from .manage_dialog import ManageDialog
 from .manage_page import ManagePage
 from .mirror_page import MirrorPage
@@ -92,6 +94,8 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         export_action.triggered.connect(functools.partial(self._show_manage_dialog, "export"))
         import_action = self.findChild(QtWidgets.QAction, "act_import_driven_keys")
         import_action.triggered.connect(functools.partial(self._show_manage_dialog, "import"))
+        delete_action = self.findChild(QtWidgets.QAction, "act_delete_driven_keys")
+        delete_action.triggered.connect(self._on_delete_driven_keys)
         about_action = self.findChild(QtWidgets.QAction, "act_about")
         about_action.triggered.connect(self._on_about)
         self._build_language_menu()
@@ -186,6 +190,35 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
     def _on_history_cleared(self, _checked=False):
         self._page.clear_history()
 
+    def _on_delete_driven_keys(self, _checked=False):
+        names = [info.name for info in service.get_selected_nodes()]
+        if not names:
+            self._show_warning("⚠ " + tr("Select the driver or driven nodes first"))
+            return
+
+        linked = service.list_linked_keys(names)
+        if not linked:
+            self._show_message(tr("No driven keys are linked to the selected nodes"))
+            return
+
+        dialog = ConfirmListDialog(
+            tr("Delete Driven Keys"),
+            tr("Delete {count} driven key(s) linked to the selected nodes?", count=len(linked)),
+            [label for _, label in linked],
+            self,
+        )
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+
+        try:
+            ops.delete_driven_keys(names)
+        except (RuntimeError, ValueError) as exc:
+            self._show_warning("⚠ " + tr("Cannot delete the driven keys: {exc}", exc=exc))
+            return
+
+        print_commands(format_call("delete_driven_keys", {}, args=(shorten_names(names),)))
+        self._show_message(tr("Deleted {count} driven key(s)", count=len(linked)))
+
     def _on_about(self, _checked=False):
         lines = [
             f"sdkk  v{__version__}",
@@ -229,8 +262,8 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         if self._manage_dialogs.get(section) is dialog:
             self._manage_dialogs.pop(section)
 
-    def _on_export_requested(self, page, file_dialog_parent, names, side):
-        self._export_driven_keys(page, file_dialog_parent, names, side)
+    def _on_export_requested(self, page, file_dialog_parent, names, role):
+        self._export_driven_keys(page, file_dialog_parent, names, role)
 
     def _on_open_import_file(self, page, file_dialog_parent):
         path = self._pick_json_path(
@@ -255,7 +288,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         else:
             self._show_message(text)
 
-    def _export_driven_keys(self, page, file_dialog_parent, nodes, side):
+    def _export_driven_keys(self, page, file_dialog_parent, nodes, role):
         path = self._pick_json_path(
             tr("Export Driven Key"), save=True, parent=file_dialog_parent,
         )
@@ -263,7 +296,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             return
 
         try:
-            ops.export_driven_keys(path, nodes, side)
+            ops.export_driven_keys(path, nodes, role)
         except (OSError, ValueError, RuntimeError) as exc:
             page.messageChanged.emit(
                 "⚠ " + tr("Cannot export driven keys to {path}: {exc}", path=path, exc=exc), True,
@@ -272,8 +305,10 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
         kwargs = {"path": path}
         if nodes is not None:
-            kwargs["nodes"] = nodes
-            kwargs["side"] = side
+            kwargs["nodes"] = shorten_names(nodes)
+
+        if role is not Role.DRIVER:
+            kwargs["role"] = role
 
         print_commands(format_call("export_driven_keys", kwargs))
         page.messageChanged.emit(tr("Exported driven keys to {path}", path=path), False)

@@ -148,6 +148,8 @@
     </property>
     <addaction name="act_export_driven_keys"/>
     <addaction name="act_import_driven_keys"/>
+    <addaction name="separator"/>
+    <addaction name="act_delete_driven_keys"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -189,6 +191,14 @@
   <action name="act_export_driven_keys">
    <property name="text">
     <string>Export Driven Key...</string>
+   </property>
+  </action>
+  <action name="act_delete_driven_keys">
+   <property name="text">
+    <string>Delete Driven Key...</string>
+   </property>
+   <property name="toolTip">
+    <string>Delete every driven key linked to the selected driver or driven nodes</string>
    </property>
   </action>
   <action name="act_import_driven_keys">

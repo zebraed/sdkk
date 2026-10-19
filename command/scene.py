@@ -9,7 +9,7 @@ from maya import cmds
 
 from ..core.model import Plug
 from ..core.setup_state import is_transform_attr
-from ..core.state import Side, Status
+from ..core.state import Role, Status
 from . import drivenkey
 
 
@@ -266,7 +266,7 @@ def list_driver_attrs(node):
         list[str]: アトリビュートのロングネーム。重複しない
     """
     attrs = []
-    for key in drivenkey.list_driven_keys([node], Side.DRIVER):
+    for key in drivenkey.list_driven_keys([node], Role.DRIVER):
         if key.driver is None:
             continue
 
@@ -291,7 +291,7 @@ def list_driven_curves(driven, driver=None):
         list[str]: animCurveノード名
     """
     if driver is None:
-        keys = drivenkey.list_driven_keys([driven], Side.DRIVEN)
+        keys = drivenkey.list_driven_keys([driven], Role.DRIVEN)
         return [key.curve for key in keys]
 
     key = drivenkey.find_driven_key(driver, driven)
@@ -314,7 +314,7 @@ def list_driven_curve_info(driven):
             blendWeightedは内側から外側の順。直結ならblendWeightedは空
     """
     info = []
-    for key in drivenkey.list_driven_keys([driven], Side.DRIVEN):
+    for key in drivenkey.list_driven_keys([driven], Role.DRIVEN):
         blend_names = []
         if key.route is not None:
             blend_names = [level.name for level in key.route.get_blend_data()]
@@ -342,7 +342,7 @@ def list_driven_plugs(driver):
         list[str]: ドリブンアトリビュート。読み取れないドリブンキーは含まない
     """
     plugs = []
-    for key in drivenkey.list_driven_keys([driver], Side.DRIVER):
+    for key in drivenkey.list_driven_keys([driver], Role.DRIVER):
         if key.status is not Status.OK:
             continue
 

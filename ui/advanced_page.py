@@ -11,7 +11,7 @@ from .. import ops, service
 from ..i18n import tr
 from ..core.state import ConflictPolicy
 from . import translate
-from .command_print import format_call, print_commands
+from .command_print import format_call, print_commands, shorten_name, shorten_names
 from .convert_row_model import ConvertRow, ConvertRowModel
 from .maya_events import SceneWatcher
 from .widgets.collapsible_group import CollapsibleGroup
@@ -109,6 +109,7 @@ class AdvancedPage(QtWidgets.QWidget):
         self._table = find(QtWidgets.QTableView, "table_rows")
         self._btn_check_all = find(QtWidgets.QPushButton, "btn_check_all")
         self._btn_uncheck_all = find(QtWidgets.QPushButton, "btn_uncheck_all")
+        self._btn_clear = find(QtWidgets.QPushButton, "btn_clear")
         self._label_summary = find(QtWidgets.QLabel, "label_summary")
         self._btn_convert = find(QtWidgets.QPushButton, "btn_convert")
 
@@ -140,6 +141,7 @@ class AdvancedPage(QtWidgets.QWidget):
         self._btn_load.clicked.connect(self._on_load)
         self._btn_check_all.clicked.connect(self._on_check_all)
         self._btn_uncheck_all.clicked.connect(self._on_uncheck_all)
+        self._btn_clear.clicked.connect(self._on_clear)
         self._btn_convert.clicked.connect(self._on_convert)
         self._model.dataChanged.connect(self._update_summary)
 
@@ -163,6 +165,9 @@ class AdvancedPage(QtWidgets.QWidget):
         self._model.set_rows([], keep_checked=False)
         translate.bind(self._label_summary, "setText", "Not loaded")
         self._btn_convert.setEnabled(False)
+
+    def _on_clear(self, _checked=False):
+        self._clear()
 
     def _on_scene_changed(self):
         self._clear()
@@ -256,7 +261,7 @@ class AdvancedPage(QtWidgets.QWidget):
             self.messageChanged.emit("⚠ " + tr("Cannot convert the animation: {exc}", exc=exc), True)
             return
 
-        kwargs = {"driver": self._driver_plug, "driven": plugs}
+        kwargs = {"driver": shorten_name(self._driver_plug), "driven": shorten_names(plugs)}
         if policy is not ConflictPolicy.REPLACE:
             kwargs["policy"] = policy
 

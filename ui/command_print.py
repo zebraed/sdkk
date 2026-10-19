@@ -5,23 +5,12 @@ GUIが行った操作をPythonコマンドとして、Script Editorへ出力す�
 """
 import enum
 
+from .. import service
+
 PACKAGE = __name__.partition(".")[0]
 
 
-class Expression:
-    """A piece of code printed as it is, such as a variable name.
-
-    変数名など、そのまま出力するコード
-
-    Args:
-        text (str): コード
-    """
-
-    def __init__(self, text):
-        self.text = text
-
-
-def format_call(func_name, kwargs, assign=None, args=()):
+def format_call(func_name, kwargs, args=()):
     """Format a call of a function of the package, mostly with keyword arguments.
 
     パッケージの関数の呼び出しを、主にキーワード引数で整形する
@@ -29,20 +18,19 @@ def format_call(func_name, kwargs, assign=None, args=()):
     Args:
         func_name (str): パッケージの関数名
         kwargs (dict): 渡すキーワード引数。順序はそのまま出力する
-            値はEnumのメンバー、Expression、またはreprがコードになる値
-        assign (Optional[str]): 戻り値を代入する変数名。Noneなら代入しない
+            値は、文字列・数値・真偽値・None・IntEnum（intとして出力）と、それらのリスト
+            パッケージの内部のオブジェクトは渡さない。コードを読む人が、パッケージの型を知らなくても読めるようにする
         args (Sequence): キーワードにできない位置引数。*nodesを受け取る関数に使う
             kwargsより前に出力する
 
     Returns:
         str: 呼び出しのコード。引数がなければ1行、あれば引数ごとに改行する
-    """
-    prefix = ""
-    if assign is not None:
-        prefix = f"{assign} = "
 
+    Raises:
+        TypeError: 出力できない型の値を渡した場合
+    """
     if not kwargs and not args:
-        return f"{prefix}{PACKAGE}.{func_name}()"
+        return f"{PACKAGE}.{func_name}()"
 
     lines = []
     for value in args:
@@ -51,7 +39,36 @@ def format_call(func_name, kwargs, assign=None, args=()):
     for name, value in kwargs.items():
         lines.append(f"    {name}={_format_value(value)},")
 
-    return "\n".join([f"{prefix}{PACKAGE}.{func_name}(", *lines, ")"])
+    return "\n".join([f"{PACKAGE}.{func_name}(", *lines, ")"])
+
+
+def shorten_names(names):
+    """Shorten node names or attributes, as long as the short name picks one node.
+
+    ノード名またはアトリビュートを、短い名前で1つのノードに決まる限り短くする
+    出力するコードを読みやすくするためで、実行にはロングネームを使う
+
+    Args:
+        names (Iterable[str]): ノードのロングネーム、または"ノード.アトリビュート"
+
+    Returns:
+        list[str]: 同じ順の名前。短い名前が複数のノードに当たる場合は、元のまま
+    """
+    return service.shorten_names(names)
+
+
+def shorten_name(name):
+    """Shorten a node name or an attribute. See shorten_names.
+
+    ノード名またはアトリビュートを短くする。shorten_namesを参照
+
+    Args:
+        name (str): ノードのロングネーム、または"ノード.アトリビュート"
+
+    Returns:
+        str: 短くした名前
+    """
+    return service.shorten_names([name])[0]
 
 
 def print_commands(*statements):
@@ -66,10 +83,13 @@ def print_commands(*statements):
 
 
 def _format_value(value):
-    if isinstance(value, Expression):
-        return value.text
+    if isinstance(value, enum.IntEnum):
+        return str(int(value))
 
-    if isinstance(value, enum.Enum):
-        return f"{PACKAGE}.{type(value).__name__}.{value.name}"
+    if isinstance(value, (list, tuple)):
+        return "[" + ", ".join(_format_value(item) for item in value) + "]"
 
-    return repr(value)
+    if value is None or isinstance(value, (str, int, float)):
+        return repr(value)
+
+    raise TypeError(f"Cannot print a {type(value).__name__} as a command argument")

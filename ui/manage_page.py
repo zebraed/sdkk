@@ -10,9 +10,9 @@ from Qt import QtCompat, QtCore, QtWidgets
 from .. import ops, service
 from ..i18n import tr
 from ..core.serialize import read_document
-from ..core.state import ConflictPolicy, Side
+from ..core.state import ConflictPolicy, Role
 from . import translate
-from .command_print import Expression, format_call, print_commands
+from .command_print import format_call, print_commands
 from .export_target_model import ExportTargetModel
 from .import_item_model import ImportItemModel
 from .maya_events import SceneWatcher
@@ -20,7 +20,7 @@ from .widgets.collapsible_group import CollapsibleGroup
 from .widgets.empty_hint import EmptyHint
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "manage_page.ui")
-_PARTNER_TITLES = {Side.DRIVER: "Drivens", Side.DRIVEN: "Drivers"}
+_PARTNER_TITLES = {Role.DRIVER: "Drivens", Role.DRIVEN: "Drivers"}
 
 
 class ManagePage(QtWidgets.QWidget):
@@ -34,7 +34,7 @@ class ManagePage(QtWidgets.QWidget):
         parent (Optional[QtWidgets.QWidget]):
 
     Signals:
-        exportRequested (list, object): チェックされたノードのロングネームと、その側（Side）
+        exportRequested (list, object): チェックされたノードのロングネームと、その役割（Role）
         openFileRequested (): Open Fileが押された。ファイルを選んだ後にload_fileを呼ぶ
         messageChanged (str, bool): StatusBarに出す文字列と、警告かどうか
     """
@@ -49,7 +49,7 @@ class ManagePage(QtWidgets.QWidget):
         translate.bind_ui(self)
         self._select_on_click = select_on_click
         self._unlock_locked = unlock_locked
-        self._side = Side.DRIVER
+        self._role = Role.DRIVER
         self._document = None
         self._path = None
 
@@ -122,6 +122,7 @@ class ManagePage(QtWidgets.QWidget):
         self._table = find(QtWidgets.QTableView, "table_targets")
         self._btn_check_all = find(QtWidgets.QPushButton, "btn_check_all")
         self._btn_uncheck_all = find(QtWidgets.QPushButton, "btn_uncheck_all")
+        self._btn_clear = find(QtWidgets.QPushButton, "btn_clear")
         self._label_summary = find(QtWidgets.QLabel, "label_summary")
         self._btn_export = find(QtWidgets.QPushButton, "btn_export")
         self._btn_open_file = find(QtWidgets.QPushButton, "btn_open_file")
@@ -130,6 +131,7 @@ class ManagePage(QtWidgets.QWidget):
         self._table_items = find(QtWidgets.QTableView, "table_items")
         self._btn_import_check_all = find(QtWidgets.QPushButton, "btn_import_check_all")
         self._btn_import_uncheck_all = find(QtWidgets.QPushButton, "btn_import_uncheck_all")
+        self._btn_import_clear = find(QtWidgets.QPushButton, "btn_import_clear")
         self._label_import_summary = find(QtWidgets.QLabel, "label_import_summary")
         self._btn_import = find(QtWidgets.QPushButton, "btn_import")
 
@@ -176,6 +178,7 @@ class ManagePage(QtWidgets.QWidget):
         self._btn_load_scene.clicked.connect(self._on_load_scene)
         self._btn_check_all.clicked.connect(self._on_check_all)
         self._btn_uncheck_all.clicked.connect(self._on_uncheck_all)
+        self._btn_clear.clicked.connect(self._on_clear)
         self._btn_export.clicked.connect(self._on_export)
         self._table.clicked.connect(self._on_row_clicked)
         self._model.dataChanged.connect(self._update_summary)
@@ -185,13 +188,26 @@ class ManagePage(QtWidgets.QWidget):
         self._unlock_locked.toggled.connect(self._on_unlock_toggled)
         self._btn_import_check_all.clicked.connect(self._on_import_check_all)
         self._btn_import_uncheck_all.clicked.connect(self._on_import_uncheck_all)
+        self._btn_import_clear.clicked.connect(self._on_import_clear)
         self._btn_import.clicked.connect(self._on_import)
         self._import_model.dataChanged.connect(self._update_import_summary)
 
     def _clear(self):
-        self._model.set_targets([], _PARTNER_TITLES[self._side])
+        self._model.set_targets([], _PARTNER_TITLES[self._role])
         translate.bind(self._label_summary, "setText", "Not loaded")
         self._btn_export.setEnabled(False)
+
+    def _on_clear(self, _checked=False):
+        self._clear()
+
+    def _on_import_clear(self, _checked=False):
+        self._document = None
+        self._path = None
+        translate.bind(self._label_file, "setText", "(no file)")
+        self._label_file.setToolTip("")
+        self._import_model.set_items([], keep_checked=False)
+        translate.bind(self._label_import_summary, "setText", "Not loaded")
+        self._btn_import.setEnabled(False)
 
     def _on_scene_changed(self):
         self._clear()
@@ -260,43 +276,35 @@ class ManagePage(QtWidgets.QWidget):
         policy = self._combo_policy.currentData()
         unlock = self._unlock_locked.isChecked()
         rows = self._import_model.list_checked_rows()
-        if len(rows) == self._import_model.rowCount():
-            kwargs = {"path": self._path}
-            if policy is not ConflictPolicy.REPLACE:
-                kwargs["policy"] = policy
+        kwargs = {"path": self._path}
+        if len(rows) != self._import_model.rowCount():
+            names = [self._import_model.get_item(row).data.name for row in rows]
+            if None in names:
+                print("# " + tr(
+                    "The driven keys in the file have no names, so this import cannot be written as one command",
+                ))
+                return
 
-            if unlock:
-                kwargs["unlock"] = True
+            kwargs["curves"] = names
 
-            print_commands(format_call("import_driven_keys", kwargs))
-            return
+        if policy is not ConflictPolicy.REPLACE:
+            kwargs["policy"] = policy
 
-        # 一部の行だけを適用したので、import_driven_keysでは再現できない。行の位置で選ぶ
-        chosen = Expression(f"[document.driven_keys[row] for row in {rows!r}]")
-        print_commands(
-            format_call("read_document", {"path": self._path}, assign="document"),
-            format_call(
-                "plan_driven_keys",
-                {"driven_keys": chosen, "policy": policy, "unlock": unlock},
-                assign="items",
-            ),
-            format_call("apply_plan", {
-                "items": Expression("items"),
-                "linear_unit": Expression("document.linear_unit"),
-                "angle_unit": Expression("document.angle_unit"),
-            }),
-        )
+        if unlock:
+            kwargs["unlock"] = True
+
+        print_commands(format_call("import_driven_keys", kwargs))
 
     def _load(self, selected_only):
-        targets = service.list_export_targets(self._side, selected_only)
-        self._model.set_targets(targets, _PARTNER_TITLES[self._side])
+        targets = service.list_export_targets(self._role, selected_only)
+        self._model.set_targets(targets, _PARTNER_TITLES[self._role])
         self._table.resizeColumnsToContents()
         if not targets:
             # 側と範囲の4通りの原文を、そのままカタログに持つ
             if selected_only:
-                source = f"No {self._side.value} nodes in the selection"
+                source = f"No {self._role.name.lower()} nodes in the selection"
             else:
-                source = f"No {self._side.value} nodes in the scene"
+                source = f"No {self._role.name.lower()} nodes in the scene"
 
             translate.bind(self._label_summary, "setText", source)
             self._btn_export.setEnabled(False)
@@ -315,9 +323,9 @@ class ManagePage(QtWidgets.QWidget):
 
     def _on_side_toggled(self, driver_checked):
         if driver_checked:
-            self._side = Side.DRIVER
+            self._role = Role.DRIVER
         else:
-            self._side = Side.DRIVEN
+            self._role = Role.DRIVEN
 
         self._clear()
 
@@ -343,4 +351,4 @@ class ManagePage(QtWidgets.QWidget):
             self.messageChanged.emit("⚠ " + tr("The checked nodes no longer exist. Load again"), True)
             return
 
-        self.exportRequested.emit(names, self._side)
+        self.exportRequested.emit(names, self._role)

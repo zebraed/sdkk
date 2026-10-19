@@ -21,10 +21,10 @@ from .core.state import (
     ConflictPolicy,
     MirrorStatus,
     PlanStatus,
-    Side,
+    Role,
     Status,
 )
-from .core.model import Document, resolve_key_pairs
+from .core.model import Document, MirrorRule, resolve_key_pairs
 from .core.serialize import read_document, write_document
 
 logger = logging.getLogger(__name__)
@@ -451,35 +451,43 @@ def delete_driven_key(driver, driven):
 
 
 @undo_chunk
-def delete_driven_keys(*nodes):
-    """Delete the driven keys that drive the given nodes or attributes.
+def delete_driven_keys(*nodes, role=Role.BOTH):
+    """Delete the driven keys linked to the given nodes or attributes.
 
-    指定したノードまたはアトリビュートを動かしているドリブンキーを削除する
+    指定したノードまたはアトリビュートにつながっているドリブンキーを削除する
 
-    Nodes can be passed as separate arguments or as one list. An
-    animCurve name deletes that curve itself. Curves connected through a
-    blendWeighted are deleted too, and a blendWeighted left without
-    inputs is removed. Names that do not exist are skipped.
+    By default, the driven keys that drive a node and the ones it drives
+    are both deleted. Nodes can be passed as separate arguments or as one
+    list. An animCurve name deletes that curve itself. Curves connected
+    through a blendWeighted are deleted too, and a blendWeighted left
+    without inputs is removed. Names that do not exist are skipped.
 
+    既定では、ノードを動かしているドリブンキーと、ノードが動かしているドリブンキーの両方を削除する
     ノードは個別の引数でも1つのリストでも渡せる。animCurve名を渡すとそのカーブ自身を削除する
     blendWeightedを経由するカーブも削除し、入力がなくなったblendWeightedも消す
     存在しない名前は飛ばす
 
     Args:
-        *nodes (str): ドリブンのノード名、アトリビュート名、またはanimCurveノード名
+        *nodes (str): ノード名、アトリビュート名、またはanimCurveノード名
+        role (Role): nodesをドライバー側とドリブン側のどちらとして探すか
+            0（Role.DRIVER）、1（Role.DRIVEN）、2（Role.BOTH）。既定は両方
 
     Returns:
         list[str]: 削除したanimCurveノード名
 
+    Raises:
+        ValueError: sideが0、1、2のどれでもない場合
+
     Examples:
         >>> import sdkk
-        >>> # lip_L_jntを動かしているドリブンキーをすべて削除する
-        >>> sdkk.delete_driven_keys("lip_L_jnt")
+        >>> # jaw_ctlとlip_L_jntにつながっているドリブンキーをすべて削除する
+        >>> sdkk.delete_driven_keys(["jaw_ctl", "lip_L_jnt"])
         ['jaw_ctl_rotateX_to_lip_L_jnt_translateY_animCurveUL',
          'mouth_ctl_translateY_to_lip_L_jnt_translateY_animCurveUL']
-        >>> # アトリビュートを指定する。リストでも渡せる
+        >>> # アトリビュートを動かしているドリブンキーだけを削除する（1はSide.DRIVEN）
         >>> sdkk.delete_driven_keys(
         ...     ["lip_R_jnt.translateY", "lip_R_jnt.rotateZ"],
+        ...     role=1,
         ... )
         ['jaw_ctl_rotateX_to_lip_R_jnt_translateY_animCurveUL']
     """
@@ -495,7 +503,7 @@ def delete_driven_keys(*nodes):
 
     keys = list_driven_keys(
         [node for node in nodes if cmds.objExists(node)],
-        Side.DRIVEN,
+        role,
     )
     for key in keys:
         key.delete()
@@ -531,7 +539,7 @@ def rename_driven_keys(keys):
     Examples:
         >>> import sdkk
         >>> sdkk.rename_driven_keys(
-        ...     sdkk.list_driven_keys(["lip_L_jnt"]),
+        ...     sdkk.list_driven_keys(["lip_L_jnt"], sdkk.Role.DRIVEN),
         ... )
         ['jaw_ctl_rotateX_to_lip_L_jnt_translateY_animCurveUL']
     """
@@ -554,7 +562,7 @@ def rename_driven_keys(keys):
 
 @undo_chunk
 def copy_driven_keys(
-    nodes, node_mapper, side=Side.DRIVEN,
+    nodes, node_mapper, role=Role.DRIVER,
     policy=ConflictPolicy.REPLACE, unlock=False
 ):
     """Copy driven keys to a destination whose names have been replaced.
@@ -570,7 +578,8 @@ def copy_driven_keys(
     Args:
         nodes (Iterable[str]): コピー元を探す起点のノードまたはアトリビュート
         node_mapper (Callable[[str], str]): コピー元からコピー先へのノード名の置換関数
-        side (Side): nodesをドリブン側とドライバー側のどちらとして探すか
+        role (Role): nodesをドライバー側とドリブン側のどちらとして探すか
+            0（Role.DRIVER）か1（Role.DRIVEN）。既定はドライバー側
         policy (ConflictPolicy): コピー先に同じ組がすでにある場合の扱い
         unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
 
@@ -579,21 +588,21 @@ def copy_driven_keys(
 
     Examples:
         >>> import sdkk
-        >>> # arm01のドリブンキーを、ドライバーも含めてarm02へコピーする
+        >>> # arm01のドライバーが動かすドリブンキーを、ドライバーも含めてarm02へコピーする
         >>> result = sdkk.copy_driven_keys(
-        ...     ["arm01_sdk"],
+        ...     ["arm01_ctl"],
         ...     sdkk.ReplaceMapper("arm01", "arm02"),
         ... )
         >>> result.created
         ('arm02_ctl_bend_to_arm02_sdk_rotateZ_animCurveUA',)
-        >>> # ドライバー側のノードから探すこともできる
+        >>> # ドリブン側のノードから探すこともできる（1はSide.DRIVEN）
         >>> result = sdkk.copy_driven_keys(
-        ...     ["arm01_ctl"],
+        ...     ["arm01_sdk"],
         ...     sdkk.ReplaceMapper("arm01", "arm02"),
-        ...     side=sdkk.Side.DRIVER,
+        ...     role=1,
         ... )
     """
-    sources = _read_driven_keys(nodes, side)
+    sources = _read_driven_keys(nodes, role)
     pairs = [(source, source.renamed(node_mapper)) for source in sources]
     return _log_apply_result(
         "Copied driven keys",
@@ -603,7 +612,8 @@ def copy_driven_keys(
 
 @undo_chunk
 def mirror_driven_keys(
-    nodes, rule, side=Side.DRIVEN, policy=ConflictPolicy.REPLACE, unlock=False
+    nodes, rule=None, role=Role.DRIVER, policy=ConflictPolicy.REPLACE, unlock=False,
+    *, search=None, replace=None, regex=False, invert_driver=(), invert_driven=(),
 ):
     """Copy driven keys to the opposite side, per the mirror rule.
 
@@ -611,16 +621,25 @@ def mirror_driven_keys(
 
     Args:
         nodes (Iterable[str]): ミラー元を探す起点のノードまたはアトリビュート
-        rule (MirrorRule): 名前の置換と、軸を反転するアトリビュート
-        side (Side): nodesをドリブン側とドライバー側のどちらとして探すか
+        rule (Optional[MirrorRule]): 名前の置換と、軸を反転するアトリビュート
+            Noneの場合は、search以降の引数でルールを作る
+        role (Role): nodesをドライバー側とドリブン側のどちらとして探すか
+            0（Role.DRIVER）か1（Role.DRIVEN）。既定はドライバー側
         policy (ConflictPolicy): ミラー先に同じ組がすでにある場合の扱い
+            0（ConflictPolicy.REPLACE）か1（ConflictPolicy.SKIP）
         unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
+        search (Optional[str]): ruleを渡さない場合の、置き換える文字列
+        replace (Optional[str]): ruleを渡さない場合の、置き換え先の文字列
+        regex (bool): searchを正規表現として扱うか
+        invert_driver (Iterable[str]): ドライバー軸を反転するドライバーアトリビュートのロングネーム
+        invert_driven (Iterable[str]): ドリブン軸（値）を反転するドリブンアトリビュートのロングネーム
 
     Returns:
         ApplyResult: 結果
 
     Raises:
-        ValueError: step系の接線を含むカーブのドライバー軸を反転しようとした場合
+        ValueError: ruleとsearchの両方、またはどちらも渡さなかった場合、replaceがない場合、
+            step系の接線を含むカーブのドライバー軸を反転しようとした場合
             シーンを変更する前に送出する
 
     Examples:
@@ -629,12 +648,28 @@ def mirror_driven_keys(
         ...     node_mapper=sdkk.SwapMapper([("_L", "_R")]),
         ...     invert_driven_attrs=frozenset({"translateX"}),
         ... )
-        >>> result = sdkk.mirror_driven_keys(["lip_L_jnt"], rule)
+        >>> result = sdkk.mirror_driven_keys(["lip_L_jnt"], rule, role=1)
         >>> result.created
         ('jaw_ctl_rotateX_to_lip_R_jnt_translateX_animCurveUL',)
+        >>> # ruleを作らず、文字列とリストだけで指定することもできる
+        >>> result = sdkk.mirror_driven_keys(
+        ...     ["lip_L_jnt"],
+        ...     role=1,
+        ...     search="_L",
+        ...     replace="_R",
+        ...     invert_driven=["translateX"],
+        ... )
     """
+    if rule is None:
+        if search is None or replace is None:
+            raise ValueError("Pass rule, or both search and replace")
+
+        rule = MirrorRule.from_text(search, replace, regex, invert_driver, invert_driven)
+    elif search is not None:
+        raise ValueError("Pass either rule or search, not both")
+
     pairs = []
-    for source in _read_driven_keys(nodes, side):
+    for source in _read_driven_keys(nodes, role):
         try:
             pairs.append((source, source.mirrored(rule)))
         except ValueError as exc:
@@ -715,7 +750,7 @@ def retarget_driven_keys(
 
     drivens = list(drivens)
     pairs = drivenkey.build_retarget_pairs(
-        _read_driven_keys([driver], Side.DRIVER),
+        _read_driven_keys([driver], Role.DRIVER),
         drivens,
         targets,
     )
@@ -732,7 +767,7 @@ def retarget_driven_keys(
     )
 
 
-def check_mirrored_driven_keys(nodes, rule, side=Side.DRIVEN):
+def check_mirrored_driven_keys(nodes, rule, role=Role.DRIVER):
     """Check that each driven key has a mirrored counterpart.
 
     The counterpart must match the mirrored result.
@@ -743,7 +778,8 @@ def check_mirrored_driven_keys(nodes, rule, side=Side.DRIVEN):
         nodes (Optional[Iterable[str]]):
             ミラー元を探す起点のノードまたはアトリビュート。Noneはシーン全体
         rule (MirrorRule): 名前の置換と、軸を反転するアトリビュート
-        side (Side): nodesをドリブン側とドライバー側のどちらとして探すか
+        role (Role): nodesをドライバー側とドリブン側のどちらとして探すか
+            0（Role.DRIVER）か1（Role.DRIVEN）。既定はドライバー側
 
     Returns:
         list[MirrorCheckItem]: 確認結果。ミラー先が正しいものも含む
@@ -765,13 +801,13 @@ def check_mirrored_driven_keys(nodes, rule, side=Side.DRIVEN):
     """
     return _log_mirror_check(
         drivenkey.check_mirrored_driven_keys(
-            _read_driven_keys(nodes, side),
+            _read_driven_keys(nodes, role),
             rule,
         ),
     )
 
 
-def export_driven_keys(path, nodes=None, side=Side.DRIVEN):
+def export_driven_keys(path, nodes=None, role=Role.DRIVER):
     """Export driven keys to a JSON file.
 
     ドリブンキーをJSONファイルへ書き出す
@@ -779,7 +815,8 @@ def export_driven_keys(path, nodes=None, side=Side.DRIVEN):
     Args:
         path (str): 書き出し先のファイルパス
         nodes (Optional[Iterable[str]]): 書き出すドリブンキーを探す起点。Noneはシーン全体
-        side (Side): nodesをドリブン側とドライバー側のどちらとして探すか
+        role (Role): nodesをドライバー側とドリブン側のどちらとして探すか
+            0（Role.DRIVER）か1（Role.DRIVEN）。既定はドライバー側
 
     Returns:
         bool: 書き出せた場合はTrue
@@ -790,7 +827,13 @@ def export_driven_keys(path, nodes=None, side=Side.DRIVEN):
         >>> sdkk.export_driven_keys(
         ...     "path/to/face_sdk.json",
         ...     ["jaw_ctl", "brow_L_ctl"],
-        ...     side=sdkk.Side.DRIVER,
+        ... )
+        True
+        >>> # ドリブンのノードを起点に書き出す（1はSide.DRIVEN）
+        >>> sdkk.export_driven_keys(
+        ...     "path/to/lip_sdk.json",
+        ...     ["lip_L_jnt"],
+        ...     role=1,
         ... )
         True
         >>> # シーン全体を書き出す
@@ -798,7 +841,7 @@ def export_driven_keys(path, nodes=None, side=Side.DRIVEN):
         True
     """
     document = Document(
-        driven_keys=tuple(_read_driven_keys(nodes, side)),
+        driven_keys=tuple(_read_driven_keys(nodes, role)),
         linear_unit=cmds.currentUnit(q=True, l=True),
         angle_unit=cmds.currentUnit(q=True, a=True),
         maya_version=cmds.about(v=True),
@@ -816,7 +859,7 @@ def export_driven_keys(path, nodes=None, side=Side.DRIVEN):
 
 @undo_chunk
 def import_driven_keys(
-    path, node_mapper=None, policy=ConflictPolicy.REPLACE, unlock=False
+    path, node_mapper=None, policy=ConflictPolicy.REPLACE, unlock=False, curves=None
 ):
     """Read driven keys from a JSON file and apply them to the scene.
 
@@ -835,13 +878,17 @@ def import_driven_keys(
         node_mapper (Optional[Callable[[str], str]]): 適用先へのノード名の置換関数
             Noneは書き出し時の名前のまま適用する
         policy (ConflictPolicy): 適用先に同じ組がすでにある場合の扱い
+            0（ConflictPolicy.REPLACE）か1（ConflictPolicy.SKIP）
         unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
+        curves (Optional[Iterable[str]]): 読み込むカーブの名前（書き出し時のanimCurveノード名）
+            Noneはファイルのすべて
 
     Returns:
         bool: 失敗した項目がなければTrue
 
     Raises:
         DocumentError: ファイルの形式が不正な場合
+        ValueError: curvesに、ファイルにない名前がある場合
 
     Examples:
         >>> import sdkk
@@ -852,12 +899,27 @@ def import_driven_keys(
         >>> sdkk.import_driven_keys(
         ...     "path/to/face_sdk.json",
         ...     mapper,
-        ...     policy=sdkk.ConflictPolicy.SKIP,
+        ...     policy=1,
+        ... )
+        True
+        >>> # ファイルの一部のカーブだけを読み込む
+        >>> sdkk.import_driven_keys(
+        ...     "path/to/face_sdk.json",
+        ...     curves=["jaw_ctl_rotateX_to_lip_L_jnt_translateY_animCurveUL"],
         ... )
         True
     """
     document = read_document(path)
     driven_keys = document.driven_keys
+    if curves is not None:
+        wanted = set(curves)
+        names = {data.name for data in driven_keys}
+        unknown = sorted(wanted - names)
+        if unknown:
+            raise ValueError(f"Curves not found in the file: {', '.join(unknown)}")
+
+        driven_keys = [data for data in driven_keys if data.name in wanted]
+
     if node_mapper is not None:
         driven_keys = [data.renamed(node_mapper) for data in driven_keys]
 
@@ -1059,8 +1121,8 @@ def _log_mirror_check(items):
     return items
 
 
-def _read_driven_keys(nodes, side):
-    keys = list_driven_keys(nodes, side)
+def _read_driven_keys(nodes, role):
+    keys = list_driven_keys(nodes, role)
     unreadable = [key for key in keys if key.status is not Status.OK]
     if unreadable:
         descriptions = [f"{key.curve} ({key.status.value})" for key in unreadable]

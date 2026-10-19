@@ -10,11 +10,11 @@ from Qt import QtCompat, QtCore, QtWidgets
 
 from .. import ops, service
 from ..i18n import tr
-from ..core.model import MirrorRule, ReplaceMapper
+from ..core.model import MirrorRule
 from ..core.setup_state import TRANSFORM_ATTRS
-from ..core.state import ConflictPolicy, Side
+from ..core.state import ConflictPolicy, Role
 from . import translate
-from .command_print import PACKAGE, Expression, format_call, print_commands
+from .command_print import format_call, print_commands
 from .maya_events import SceneWatcher
 from .mirror_row_model import MirrorRow, MirrorRowModel, is_fixable
 from .widgets.collapsible_group import CollapsibleGroup
@@ -49,7 +49,7 @@ class MirrorPage(QtWidgets.QWidget):
         QtCompat.loadUi(UI_PATH, self)
         translate.bind_ui(self)
         self._unlock_locked = unlock_locked
-        self._side = Side.DRIVER
+        self._role = Role.DRIVER
         self._sources = []
         self._overrides = {}
 
@@ -137,6 +137,7 @@ class MirrorPage(QtWidgets.QWidget):
         self._table = find(QtWidgets.QTableView, "table_rows")
         self._btn_check_all = find(QtWidgets.QPushButton, "btn_check_all")
         self._btn_uncheck_all = find(QtWidgets.QPushButton, "btn_uncheck_all")
+        self._btn_clear = find(QtWidgets.QPushButton, "btn_clear")
         self._label_summary = find(QtWidgets.QLabel, "label_summary")
         self._btn_mirror = find(QtWidgets.QPushButton, "btn_mirror")
 
@@ -191,6 +192,7 @@ class MirrorPage(QtWidgets.QWidget):
         self._btn_load_scene.clicked.connect(self._on_load_scene)
         self._btn_check_all.clicked.connect(self._on_check_all)
         self._btn_uncheck_all.clicked.connect(self._on_uncheck_all)
+        self._btn_clear.clicked.connect(self._on_clear)
         self._btn_mirror.clicked.connect(self._on_mirror)
         self._model.dataChanged.connect(self._update_summary)
         self._model.invertEdited.connect(self._on_invert_edited)
@@ -203,25 +205,20 @@ class MirrorPage(QtWidgets.QWidget):
 
         return attrs
 
-    def _get_mapper_args(self):
-        search = self._edit_search.text()
-        replace = self._edit_replace.text()
-        if not search:
-            raise ValueError("Search is empty")
+    def _build_rule(self, invert_driver=(), invert_driven=()):
+        return MirrorRule.from_text(
+            self._edit_search.text(),
+            self._edit_replace.text(),
+            self._check_regex.isChecked(),
+            invert_driver,
+            invert_driven,
+        )
 
-        if self._check_regex.isChecked():
-            return search, replace
-
-        return re.escape(search), replace.replace("\\", "\\\\")
-
-    def _build_mapper(self):
-        return ReplaceMapper(*self._get_mapper_args())
-
-    def _build_rule(self, mapper, row_key, source):
+    def _build_row_rule(self, row_key, source):
         driver_default, driven_default = self._get_invert_flags(row_key, source)
         invert_driver = _to_attr_set(driver_default, source.driver.attr)
         invert_driven = _to_attr_set(driven_default, source.driven.attr)
-        return MirrorRule(mapper, invert_driver_attrs=invert_driver, invert_driven_attrs=invert_driven)
+        return self._build_rule(invert_driver, invert_driven)
 
     def _get_invert_flags(self, row_key, source):
         if row_key in self._overrides:
@@ -241,6 +238,9 @@ class MirrorPage(QtWidgets.QWidget):
         translate.bind(self._label_summary, "setText", "Not loaded")
         self._btn_mirror.setEnabled(False)
 
+    def _on_clear(self, _checked=False):
+        self._clear()
+
     def _is_locked(self, item):
         if item.target is None:
             return False
@@ -255,7 +255,7 @@ class MirrorPage(QtWidgets.QWidget):
 
     def _rebuild(self, *_args, keep_checked=False):
         try:
-            mapper = self._build_mapper()
+            self._build_rule()
         except (ValueError, re.error) as exc:
             self._model.set_rows([], keep_checked=False)
             # 例外の文言が原文。カタログにあれば翻訳される
@@ -267,7 +267,7 @@ class MirrorPage(QtWidgets.QWidget):
         for source in self._sources:
             row_key = (str(source.driver), str(source.driven))
             driver_flag, driven_flag = self._get_invert_flags(row_key, source)
-            rule = self._build_rule(mapper, row_key, source)
+            rule = self._build_row_rule(row_key, source)
             item = service.check_mirror(source, rule)
             if item is not None:
                 locked = self._is_locked(item)
@@ -303,15 +303,15 @@ class MirrorPage(QtWidgets.QWidget):
 
     def _on_side_toggled(self, driver_checked):
         if driver_checked:
-            self._side = Side.DRIVER
+            self._role = Role.DRIVER
         else:
-            self._side = Side.DRIVEN
+            self._role = Role.DRIVEN
 
         self._clear()
 
     def _load(self, selected_only):
         self._overrides = {}
-        self._sources = service.list_mirror_sources(self._side, selected_only)
+        self._sources = service.list_mirror_sources(self._role, selected_only)
         if not self._sources:
             if selected_only:
                 source = "No driven keys in the selection"
@@ -342,11 +342,10 @@ class MirrorPage(QtWidgets.QWidget):
         row_key = (str(row.source.driver), str(row.source.driven))
         self._overrides[row_key] = (row.invert_driver, row.invert_driven)
         try:
-            mapper = self._build_mapper()
+            rule = self._build_row_rule(row_key, row.source)
         except (ValueError, re.error):
             return
 
-        rule = self._build_rule(mapper, row_key, row.source)
         item = service.check_mirror(row.source, rule)
         if item is not None:
             self._model.update_item(index, item)
@@ -392,21 +391,22 @@ class MirrorPage(QtWidgets.QWidget):
             )
             groups.setdefault(invert, []).append(row.source.name)
 
-        pattern, replacement = self._get_mapper_args()
-        mapper = f"{PACKAGE}.ReplaceMapper({pattern!r}, {replacement!r})"
         statements = []
         for (invert_driver, invert_driven), origins in groups.items():
-            rule_kwargs = {"node_mapper": Expression(mapper)}
-            if invert_driver:
-                rule_kwargs["invert_driver_attrs"] = Expression(f"frozenset({sorted(invert_driver)!r})")
-
-            if invert_driven:
-                rule_kwargs["invert_driven_attrs"] = Expression(f"frozenset({sorted(invert_driven)!r})")
-
             kwargs = {
                 "nodes": origins,
-                "rule": Expression(format_call("MirrorRule", rule_kwargs).replace("\n", "\n    ")),
+                "search": self._edit_search.text(),
+                "replace": self._edit_replace.text(),
             }
+            if self._check_regex.isChecked():
+                kwargs["regex"] = True
+
+            if invert_driver:
+                kwargs["invert_driver"] = sorted(invert_driver)
+
+            if invert_driven:
+                kwargs["invert_driven"] = sorted(invert_driven)
+
             if policy is not ConflictPolicy.REPLACE:
                 kwargs["policy"] = policy
 

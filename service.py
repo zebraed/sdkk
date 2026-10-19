@@ -15,7 +15,7 @@ from .i18n import tr
 from .core.model import Plug
 from .core.pose_keys import PoseSummary, summarize_pose_keys
 from .core.setup_state import TRANSFORM_ATTRS, DriverSpec, SetupState
-from .core.state import Side, Status
+from .core.state import Role, Status
 
 SETTINGS_KEY = "sdkk_window_settings"
 HISTORY_KEY = "sdkk_history"
@@ -336,7 +336,7 @@ def _build_setup_index(state, detail_uuid, target_uuids):
     driver_attrs = set()
     if state.driver is not None and state.driver.uuid in nodes:
         driver_name = nodes[state.driver.uuid].name
-        found = drivenkey.list_driven_keys([driver_name], Side.DRIVER)
+        found = drivenkey.list_driven_keys([driver_name], Role.DRIVER)
         driver_keys = tuple(found)
         for key in driver_keys:
             if key.driver is None:
@@ -598,13 +598,13 @@ def list_driven_curves(targets, driver_plug=None):
     return CurveListing(tuple(dict.fromkeys(curves)), tuple(dict.fromkeys(blends)))
 
 
-def list_export_targets(side, selected_only):
+def list_export_targets(role, selected_only):
     """List the nodes that have driven keys to export.
 
     書き出せるドリブンキーを持つノードを列挙する
 
     Args:
-        side (Side): ドライバーのノードを探すか、ドリブンのノードを探すか
+        role (Role): ドライバーのノードを探すか、ドリブンのノードを探すか
         selected_only (bool): Trueは選択中のノードのうち、該当するものだけ。Falseはシーン全体
             ドリブンの側を解決できないドリブンキーは、どのノードにも数えない
 
@@ -618,9 +618,9 @@ def list_export_targets(side, selected_only):
         selected_uuids = {cmds.ls(name, uid=True)[0] for name in origins}
 
     groups = {}
-    for key in drivenkey.list_driven_keys(origins, side):
+    for key in drivenkey.list_driven_keys(origins, role):
         own_text, other_text = key.driven, key.driver
-        if side is Side.DRIVER:
+        if role is Role.DRIVER:
             own_text, other_text = key.driver, key.driven
 
         if own_text is None:
@@ -693,13 +693,13 @@ def plan_conversion(driven_keys, policy, unlock):
     )
 
 
-def list_mirror_sources(side, selected_only):
+def list_mirror_sources(role, selected_only):
     """List the driven keys that can be mirrored, read from the scene.
 
     ミラー元にできるドリブンキーを、シーンから読んで列挙する
 
     Args:
-        side (Side): 選択を、ドライバー側とドリブン側のどちらとして探すか
+        role (Role): 選択を、ドライバー側とドリブン側のどちらとして探すか
         selected_only (bool): Trueは選択中のノードから探す。Falseはシーン全体
 
     Returns:
@@ -710,7 +710,7 @@ def list_mirror_sources(side, selected_only):
         origins = scene.list_selected_nodes()
 
     sources = []
-    for key in drivenkey.list_driven_keys(origins, side):
+    for key in drivenkey.list_driven_keys(origins, role):
         if key.status is Status.OK:
             sources.append(key.read())
 
@@ -783,6 +783,55 @@ def read_animation_sources(driver_plug, node_names):
         sources.append(AnimationSource(plug, data))
 
     return sources
+
+
+def shorten_names(names):
+    """Shorten the node part of node names or attributes, when the short name is unique.
+
+    ノード名またはアトリビュートのノード部分を、短い名前が一意なら短くする
+
+    Args:
+        names (Iterable[str]): ノードのロングネーム、または"ノード.アトリビュート"
+
+    Returns:
+        list[str]: 同じ順の名前。短い名前が複数のノードに当たる場合は、元のまま
+    """
+    shortened = []
+    for name in names:
+        node, dot, attr = name.partition(".")
+        short = node.rpartition("|")[2]
+        if short != node and len(cmds.ls(short)) == 1:
+            node = short
+
+        shortened.append(f"{node}{dot}{attr}")
+
+    return shortened
+
+
+def list_linked_keys(node_names):
+    """List the driven keys linked to the nodes, as driver or as driven.
+
+    ノードにつながっているドリブンキーを、ドライバー側としてもドリブン側としても列挙する
+
+    Args:
+        node_names (Iterable[str]): ノード名
+
+    Returns:
+        list[tuple[str, str]]: （animCurveノード名, "ドライバー → ドリブン"の表示）。重複しない
+            読み取れないドリブンキーも含む
+    """
+    linked = []
+    for key in drivenkey.list_driven_keys(list(node_names), Role.BOTH):
+        labels = []
+        for plug in (key.driver, key.driven):
+            if plug is None:
+                labels.append("-")
+            else:
+                labels.append(shorten_names([plug])[0])
+
+        linked.append((key.curve, f"{labels[0]} → {labels[1]}"))
+
+    return linked
 
 
 def list_node_names(uuids):

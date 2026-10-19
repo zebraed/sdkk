@@ -27,7 +27,7 @@ if TYPE_CHECKING:
         MirrorStatus,
         PlanItem,
         PlanStatus,
-        Side,
+        Role,
         Status,
     )
     from .core.model import MirrorRule, NamespaceMapper, ReplaceMapper, SwapMapper, compose  # noqa: F401
@@ -91,7 +91,7 @@ _EXPORTS = {
     "PlanItem": "core.state",
     "PlanStatus": "core.state",
     "ReplaceMapper": "core.model",
-    "Side": "core.state",
+    "Role": "core.state",
     "Status": "core.state",
     "SwapMapper": "core.model",
     "compose": "core.model",

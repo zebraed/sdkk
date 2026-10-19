@@ -30,7 +30,7 @@ from ..core.state import (
     MirrorStatus,
     PlanItem,
     PlanStatus,
-    Side,
+    Role,
     Status,
 )
 
@@ -221,7 +221,7 @@ class DrivenKey:
         cmds.delete(self.curve)
 
 
-def list_driven_keys(nodes=None, side=Side.DRIVEN):
+def list_driven_keys(nodes=None, role=Role.DRIVER):
     """Enumerate driven keys.
 
     ドリブンキーを列挙する
@@ -229,18 +229,23 @@ def list_driven_keys(nodes=None, side=Side.DRIVEN):
     Args:
         nodes (Optional[Iterable[str]]): 起点のノードまたはアトリビュート。Noneはシーン全体
             animCurveノードを含めた場合は、そのカーブ自身を対象にする
-        side (Side): nodesをドリブン側とドライバー側のどちらとして探すか
+        role (Role): nodesをドライバー側とドリブン側のどちらとして探すか
+            0（Role.DRIVER）、1（Role.DRIVEN）、2（Role.BOTH）。既定はドライバー側
 
     Returns:
         list[DrivenKey]: 見つかったドリブンキー。statusがOKでないものも含む
+
+    Raises:
+        ValueError: sideが0、1、2のどれでもない場合
     """
+    role = Role(role)
     if nodes is None:
         found = cmds.ls(typ=CURVE_TYPES)
         curves = [] if found is None else found
     else:
         curves = []
         for node in nodes:
-            curves.extend(_list_curves(node, side))
+            curves.extend(_list_curves(node, role))
 
     # 同じカーブが複数の起点から見つかるため、順序を保って重複を除く
     return [DrivenKey.from_curve(curve) for curve in dict.fromkeys(curves)]
@@ -293,8 +298,8 @@ def find_driven_key(driver, driven):
         Optional[DrivenKey]: 見つからなければNone
     """
     # ドライバーの下流とドリブンの上流の両方に現れるカーブが、その組のカーブになる
-    driver_curves = set(_list_curves(driver, Side.DRIVER))
-    for curve in _list_curves(driven, Side.DRIVEN):
+    driver_curves = set(_list_curves(driver, Role.DRIVER))
+    for curve in _list_curves(driven, Role.DRIVEN):
         if curve in driver_curves:
             return DrivenKey.from_curve(curve)
 
@@ -595,13 +600,18 @@ def plan_driven_keys(
     Args:
         driven_keys (Iterable[DrivenKeyData]): 適用するデータ
         policy (ConflictPolicy): 同じドライバーとドリブンの組がすでにある場合の扱い
+            0（ConflictPolicy.REPLACE）か1（ConflictPolicy.SKIP）
         unlock (bool): ロックされたドリブンを、適用中だけ解除して適用するか
         allowed_inputs (Sequence[str]): ドリブンキー以外で、入力にあっても差し支えないノード型
             適用前に外すアニメーションのanimCurveを、あらかじめ許す場合に使う
 
     Returns:
         list[PlanItem]: PlanItemのリスト
+
+    Raises:
+        ValueError: policyが0か1でない場合
     """
+    policy = ConflictPolicy(policy)
     return [
         _plan_driven_key(data, policy, unlock, allowed_inputs)
         for data in driven_keys
@@ -823,11 +833,14 @@ def build_retarget_pairs(sources, drivens, rows):
     return pairs
 
 
-def _list_curves(node, side):
+def _list_curves(node, role):
     if "." not in node and cmds.nodeType(node) in CURVE_TYPES:
         return [node]
 
-    if side is Side.DRIVER:
+    if role is Role.BOTH:
+        return _list_curves(node, Role.DRIVER) + _list_curves(node, Role.DRIVEN)
+
+    if role is Role.DRIVER:
         return _filter_curves(
             cmds.listConnections(node, s=False, d=True, scn=True),
         )

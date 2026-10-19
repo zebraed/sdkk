@@ -1,23 +1,30 @@
 """
-Maya-free values for driven key commands: search side, status, apply policy, and results.
+Maya-free values for driven key commands: search role, status, apply policy, and results.
 
 ドリブンキーのコマンドが受け渡す、Mayaを使わないData型定義
 """
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, IntEnum
 from typing import Optional
 
 from .model import DrivenKeyData
 
 
-class Side(Enum):
-    """Whether the starting node is searched for as the driver side or the driven side.
+class Role(IntEnum):
+    """The role a starting node plays when driven keys are searched for: driver, driven, or both.
 
-    起点のノードをドライバー側とドリブン側のどちらとして探すか
+    ドリブンキーを探すときに、起点のノードが担う役割（ドライバー、ドリブン、または両方）
+
+    It is an int, so a script can pass 0 (driver), 1 (driven) or 2 (both)
+    as it is. BOTH finds the driven keys linked to the node in either role.
+
+    intなので、スクリプトからは0（ドライバー）、1（ドリブン）、2（両方）をそのまま渡せる
+    BOTHは、どちらの役割でもつながっているドリブンキーを探す
     """
 
-    DRIVER = "driver"
-    DRIVEN = "driven"
+    DRIVER = 0
+    DRIVEN = 1
+    BOTH = 2
 
 
 class Status(Enum):
@@ -33,14 +40,18 @@ class Status(Enum):
     UNSUPPORTED = "unsupported"  # blendWeightedのinput[]以外への接続など、読み書きに対応しない構成
 
 
-class ConflictPolicy(Enum):
+class ConflictPolicy(IntEnum):
     """How to handle a driver/driven pair that already exists at the apply target.
 
     適用先に同じドライバーとドリブンの組がすでにある場合の扱い
+
+    It is an int, so a script can pass 0 (replace) or 1 (skip) as it is.
+
+    intなので、スクリプトからは0（置き換える）か1（飛ばす）をそのまま渡せる
     """
 
-    REPLACE = "replace"  # 既存のカーブを削除して作り直す
-    SKIP = "skip"  # 既存のカーブを残し、適用しない
+    REPLACE = 0  # 既存のカーブを削除して作り直す
+    SKIP = 1  # 既存のカーブを残し、適用しない
 
 
 class PlanStatus(Enum):

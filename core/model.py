@@ -367,6 +367,36 @@ class MirrorRule:
         object.__setattr__(self, "invert_driver_attrs", frozenset(self.invert_driver_attrs))
         object.__setattr__(self, "invert_driven_attrs", frozenset(self.invert_driven_attrs))
 
+    @classmethod
+    def from_text(cls, search, replace, regex=False, invert_driver=(), invert_driven=()):
+        """Build a rule that replaces a text in the node names, from plain strings and lists.
+
+        ノード名の文字列を置き換えるルールを、文字列とリストから作る
+
+        Args:
+            search (str): 置き換える文字列。regexがFalseなら、そのままの文字列として探す
+            replace (str): 置き換え先の文字列。regexがTrueなら、re.subの置換文字列
+            regex (bool): searchを正規表現として扱うか
+            invert_driver (Iterable[str]): ドライバー軸を反転するドライバーアトリビュートのロングネーム
+            invert_driven (Iterable[str]): ドリブン軸（値）を反転するドリブンアトリビュートのロングネーム
+
+        Returns:
+            MirrorRule: 作成したルール
+
+        Raises:
+            ValueError: searchが空の場合
+            re.error: regexがTrueで、searchが正規表現として不正な場合
+        """
+        if not search:
+            raise ValueError("Search is empty")
+
+        if regex:
+            mapper = ReplaceMapper(search, replace)
+        else:
+            mapper = ReplaceMapper(re.escape(search), replace.replace("\\", "\\\\"))
+
+        return cls(mapper, invert_driver_attrs=invert_driver, invert_driven_attrs=invert_driven)
+
 
 @dataclass(frozen=True)
 class DrivenKeyData:

@@ -61,6 +61,19 @@ class ImportItemModel(TranslatedTableModel):
 
         return items
 
+    def get_item(self, row):
+        """Return the item on the row.
+
+        行の項目を返す
+
+        Args:
+            row (int): 行
+
+        Returns:
+            PlanItem: 項目
+        """
+        return self._items[row]
+
     def list_checked_rows(self):
         """List the rows that are checked.
 

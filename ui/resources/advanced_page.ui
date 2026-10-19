@@ -279,6 +279,16 @@
             </widget>
            </item>
            <item>
+            <widget class="QPushButton" name="btn_clear">
+             <property name="toolTip">
+              <string>Empty the list</string>
+             </property>
+             <property name="text">
+              <string>Clear</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <spacer name="spacer_check">
              <property name="orientation">
               <enum>Qt::Horizontal</enum>

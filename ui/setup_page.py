@@ -12,9 +12,10 @@ from .. import gui_ops, ops, service
 from ..core.history import push_history
 from ..i18n import tr
 from ..core.setup_state import AXES, TRANSFORM_KINDS, DriverSpec, SetupState
+from ..core.state import Role
 from . import translate
 from .driven_node_model import DrivenNodeModel
-from .command_print import format_call, print_commands
+from .command_print import format_call, print_commands, shorten_name, shorten_names
 from .maya_events import SceneWatcher
 from .node_icons import get_node_icon
 from .widgets.attr_picker import AttrPicker
@@ -84,6 +85,7 @@ class SetupPage(QtWidgets.QWidget):
         )
         self._watcher.start()
         translate.notifier.languageChanged.connect(self._on_language_changed)
+        self._restore_latest_history()
         self._refresh()
 
     def shutdown(self):
@@ -312,7 +314,6 @@ class SetupPage(QtWidgets.QWidget):
         return self._state.driven[0].uuid
 
     def _resolve_target_uuids(self):
-        # キーを打つ対象は、一覧で選択しているノード。選択がなければ詳細を表示しているノード
         targets = [u for u in self._selected_uuids() if self._state.get_driven(u) is not None]
         if not targets and self._current_uuid is not None:
             targets = [self._current_uuid]
@@ -506,7 +507,13 @@ class SetupPage(QtWidgets.QWidget):
             service.select_node(self._model.get_uuid(index.row()))
 
     def _on_table_menu(self, pos):
+        global_pos = self._table.viewport().mapToGlobal(pos)
         if not self._selected_uuids():
+            menu = QtWidgets.QMenu(self)
+            reload = menu.addAction(tr("Reload"))
+            if menu.exec_(global_pos) is reload:
+                self._refresh()
+
             return
 
         nodes = [self._state.get_driven(uuid) for uuid in self._selected_uuids()]
@@ -516,9 +523,10 @@ class SetupPage(QtWidgets.QWidget):
                 targets.append((node.uuid, attr))
 
         self._exec_item_menu(
-            self._table.viewport().mapToGlobal(pos),
+            global_pos,
             targets,
             self._remove_selected_nodes,
+            self._refresh,
         )
 
     def _on_cell_menu(self, attr, button, pos):
@@ -527,8 +535,13 @@ class SetupPage(QtWidgets.QWidget):
 
         self._exec_item_menu(button.mapToGlobal(pos), [(self._current_uuid, attr)])
 
-    def _exec_item_menu(self, global_pos, targets, on_remove=None):
+    def _exec_item_menu(self, global_pos, targets, on_remove=None, on_reload=None):
         menu = QtWidgets.QMenu(self)
+        reload = None
+        if on_reload is not None:
+            reload = menu.addAction(tr("Reload"))
+            menu.addSeparator()
+
         curve_actions = self._add_curve_menu(menu, targets)
         remove = None
         if on_remove is not None:
@@ -537,7 +550,9 @@ class SetupPage(QtWidgets.QWidget):
 
         current_actions, all_actions = self._add_delete_menus(menu, targets)
         chosen = menu.exec_(global_pos)
-        if chosen in curve_actions:
+        if reload is not None and chosen is reload:
+            on_reload()
+        elif chosen in curve_actions:
             self._select_scene_node(curve_actions[chosen])
         elif remove is not None and chosen is remove:
             on_remove()
@@ -605,8 +620,8 @@ class SetupPage(QtWidgets.QWidget):
         try:
             ops.delete_driven_key(snapshot.driver_plug, plug)
             command = format_call("delete_driven_key", {
-                "driver": snapshot.driver_plug,
-                "driven": plug,
+                "driver": shorten_name(snapshot.driver_plug),
+                "driven": shorten_name(plug),
             })
         except (RuntimeError, ValueError) as exc:
             error = "⚠ " + tr(
@@ -655,8 +670,10 @@ class SetupPage(QtWidgets.QWidget):
         error = None
         deleted = []
         try:
-            deleted = ops.delete_driven_keys([plug])
-            command = format_call("delete_driven_keys", {}, args=([plug],))
+            deleted = ops.delete_driven_keys([plug], role=Role.DRIVEN)
+            command = format_call(
+                "delete_driven_keys", {"role": Role.DRIVEN}, args=([shorten_name(plug)],),
+            )
         except (RuntimeError, ValueError) as exc:
             error = "⚠ " + tr(
                 "Cannot delete all driven keys of {plug}: {exc}", plug=f"{info.short_name}.{attr}", exc=exc,
@@ -805,6 +822,21 @@ class SetupPage(QtWidgets.QWidget):
             names = ", ".join(name.rpartition("|")[2] for name in missing)
             self._notify("⚠ " + tr("Not found in the scene: {names}", names=names))
 
+    def _restore_latest_history(self):
+        if not self._history:
+            return
+
+        entries = service.refresh_history(self._history[:1])
+        if not entries:
+            return
+
+        state, missing = service.restore_state(entries[0])
+        if missing:
+            return
+
+        self._driver_custom_view = state.driver is not None and not state.driver.is_transform
+        self._state = state
+
     def _record_history_if_driven(self):
         driven = self._snapshot.driven_state
         if not any(driven.get(key) == "driver" for key in self._state.list_plug_keys()):
@@ -883,8 +915,8 @@ class SetupPage(QtWidgets.QWidget):
             error = "⚠ " + tr("Cannot move the key: {exc}", exc=exc)
         else:
             print_commands(format_call("move_driven_keys", {
-                "driver": snapshot.driver_plug,
-                "driven_plugs": list(snapshot.key_plugs),
+                "driver": shorten_name(snapshot.driver_plug),
+                "driven_plugs": shorten_names(snapshot.key_plugs),
                 "driver_value": old,
                 "new_value": new,
             }))
@@ -898,8 +930,8 @@ class SetupPage(QtWidgets.QWidget):
         if action_id == "delete" and snapshot.driver_plug is not None:
             ops.remove_driven_keys_at(snapshot.driver_plug, snapshot.key_plugs, value)
             print_commands(format_call("remove_driven_keys_at", {
-                "driver": snapshot.driver_plug,
-                "driven_plugs": list(snapshot.key_plugs),
+                "driver": shorten_name(snapshot.driver_plug),
+                "driven_plugs": shorten_names(snapshot.key_plugs),
                 "driver_value": value,
             }))
             self._refresh()
@@ -931,8 +963,8 @@ class SetupPage(QtWidgets.QWidget):
             error = "⚠ " + tr("Key failed: {exc}", exc=exc)
         else:
             print_commands(format_call("set_driven_keys", {
-                "driver": snapshot.driver_plug,
-                "driven_plugs": list(snapshot.key_plugs),
+                "driver": shorten_name(snapshot.driver_plug),
+                "driven_plugs": shorten_names(snapshot.key_plugs),
             }))
             self._cleared_key = None
         self._refresh()
