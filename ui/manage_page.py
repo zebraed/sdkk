@@ -16,6 +16,7 @@ from .command_print import format_call, print_commands
 from .export_target_model import ExportTargetModel
 from .import_item_model import ImportItemModel
 from .maya_events import SceneWatcher
+from .node_selection import select_nodes
 from .widgets.collapsible_group import CollapsibleGroup
 from .widgets.empty_hint import EmptyHint
 
@@ -181,6 +182,7 @@ class ManagePage(QtWidgets.QWidget):
         self._btn_clear.clicked.connect(self._on_clear)
         self._btn_export.clicked.connect(self._on_export)
         self._table.clicked.connect(self._on_row_clicked)
+        self._table_items.clicked.connect(self._on_import_row_clicked)
         self._model.dataChanged.connect(self._update_summary)
 
         self._btn_open_file.clicked.connect(self._on_open_file)
@@ -342,8 +344,20 @@ class ManagePage(QtWidgets.QWidget):
         self._model.set_all_checked(False)
 
     def _on_row_clicked(self, index):
-        if index.column() != 0 and self._select_on_click.isChecked():
-            service.select_scene_nodes([self._model.get_node_name(index.row())])
+        if self._select_on_click.isChecked():
+            self._select_nodes([self._model.get_node_name(index.row())])
+
+    def _on_import_row_clicked(self, index):
+        if not self._select_on_click.isChecked():
+            return
+
+        data = self._import_model.get_item(index.row()).data
+        self._select_nodes([data.driver.node, data.driven.node])
+
+    def _select_nodes(self, names):
+        warning = select_nodes(names)
+        if warning is not None:
+            self.messageChanged.emit(warning, True)
 
     def _on_export(self, _checked=False):
         names = service.list_node_names(self._model.list_checked_uuids())

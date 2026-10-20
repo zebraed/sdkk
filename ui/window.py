@@ -82,10 +82,12 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         self.findChild(QtWidgets.QWidget, "tab_manage").layout().addWidget(self._manage)
         self._connect_manage_page(self._manage, self)
         self._manage_dialogs = {}
-        self._mirror = MirrorPage(self._options["unlock_locked"])
+        self._mirror = MirrorPage(self._options["select_on_click"], self._options["unlock_locked"])
         self.findChild(QtWidgets.QWidget, "tab_mirror").layout().addWidget(self._mirror)
         self._mirror.messageChanged.connect(self._on_manage_message)
-        self._advanced = AdvancedPage(self._page.get_conversion_source, self._options["unlock_locked"])
+        self._advanced = AdvancedPage(
+            self._page.get_conversion_source, self._options["select_on_click"], self._options["unlock_locked"],
+        )
         self.findChild(QtWidgets.QWidget, "tab_advanced").layout().addWidget(self._advanced)
         self._advanced.messageChanged.connect(self._on_manage_message)
         self._menu_history = self.findChild(QtWidgets.QMenu, "menu_history")

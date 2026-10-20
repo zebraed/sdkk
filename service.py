@@ -865,6 +865,28 @@ def select_scene_nodes(names):
     cmds.select(names, r=True)
 
 
+def select_existing_nodes(names):
+    """Select the nodes that exist in the scene, and skip the others.
+
+    シーンにあるノードだけを選択し、ないノードは飛ばす
+
+    Args:
+        names (Iterable[str]): ノード名
+
+    Returns:
+        list[str]: 選択したノード名。1つもなければ空で、選択は変えない
+    """
+    found = []
+    for name in names:
+        if cmds.objExists(name) and name not in found:
+            found.append(name)
+
+    if found:
+        cmds.select(found, r=True)
+
+    return found
+
+
 def select_node(uuid):
     """Select a node in the scene.
 

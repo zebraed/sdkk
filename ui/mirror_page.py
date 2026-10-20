@@ -16,6 +16,7 @@ from ..core.state import ConflictPolicy, Role
 from . import translate
 from .command_print import format_call, print_commands
 from .maya_events import SceneWatcher
+from .node_selection import select_nodes
 from .mirror_row_model import MirrorRow, MirrorRowModel, is_fixable
 from .widgets.collapsible_group import CollapsibleGroup
 from .widgets.empty_hint import EmptyHint
@@ -35,6 +36,7 @@ class MirrorPage(QtWidgets.QWidget):
     行ごとに反転の指定を持つ。最初はルールの既定値で、行で直した指定は、そのドリブンキーに残る
 
     Args:
+        select_on_click (QtWidgets.QAction): 行クリックでMayaの選択を切り替えるかを決めるチェック付きアクション
         unlock_locked (QtWidgets.QAction): 適用中にロックされたドリブンを解除するかを決めるチェック付きアクション
         parent (Optional[QtWidgets.QWidget]): 親
 
@@ -44,10 +46,11 @@ class MirrorPage(QtWidgets.QWidget):
 
     messageChanged = QtCore.Signal(str, bool)
 
-    def __init__(self, unlock_locked, parent=None):
+    def __init__(self, select_on_click, unlock_locked, parent=None):
         super().__init__(parent)
         QtCompat.loadUi(UI_PATH, self)
         translate.bind_ui(self)
+        self._select_on_click = select_on_click
         self._unlock_locked = unlock_locked
         self._role = Role.DRIVER
         self._sources = []
@@ -193,6 +196,7 @@ class MirrorPage(QtWidgets.QWidget):
         self._btn_check_all.clicked.connect(self._on_check_all)
         self._btn_uncheck_all.clicked.connect(self._on_uncheck_all)
         self._btn_clear.clicked.connect(self._on_clear)
+        self._table.clicked.connect(self._on_row_clicked)
         self._btn_mirror.clicked.connect(self._on_mirror)
         self._model.dataChanged.connect(self._update_summary)
         self._model.invertEdited.connect(self._on_invert_edited)
@@ -240,6 +244,23 @@ class MirrorPage(QtWidgets.QWidget):
 
     def _on_clear(self, _checked=False):
         self._clear()
+
+    def _on_row_clicked(self, index):
+        column = index.column()
+        if column in (2, 3) or not self._select_on_click.isChecked():
+            return
+
+        row = self._model.get_row(index.row())
+        data = row.source
+        if column == 1:
+            data = row.item.target
+
+        if data is None:
+            return
+
+        warning = select_nodes([data.driver.node, data.driven.node])
+        if warning is not None:
+            self.messageChanged.emit(warning, True)
 
     def _is_locked(self, item):
         if item.target is None:

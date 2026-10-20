@@ -67,6 +67,17 @@ class ConvertRowModel(TranslatedTableModel):
         self._checked = checked
         self.endResetModel()
 
+    def get_row(self, index):
+        """Return the row.
+
+        Args:
+            index (int): 行の位置
+
+        Returns:
+            ConvertRow: 行
+        """
+        return self._rows[index]
+
     def list_checked_rows(self):
         """List the checked rows.
 

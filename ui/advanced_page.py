@@ -14,6 +14,7 @@ from . import translate
 from .command_print import format_call, print_commands, shorten_name, shorten_names
 from .convert_row_model import ConvertRow, ConvertRowModel
 from .maya_events import SceneWatcher
+from .node_selection import select_nodes
 from .widgets.collapsible_group import CollapsibleGroup
 from .widgets.empty_hint import EmptyHint
 
@@ -30,6 +31,7 @@ class AdvancedPage(QtWidgets.QWidget):
 
     Args:
         read_source (Callable[[], tuple]): ドライバーアトリビュート（未設定ならNone）と、ドリブンのノード名を返す関数
+        select_on_click (QtWidgets.QAction): 行クリックでMayaの選択を切り替えるかを決めるチェック付きアクション
         unlock_locked (QtWidgets.QAction): 適用中にロックされたドリブンを解除するかを決めるチェック付きアクション
         parent (Optional[QtWidgets.QWidget]): 親
 
@@ -39,11 +41,12 @@ class AdvancedPage(QtWidgets.QWidget):
 
     messageChanged = QtCore.Signal(str, bool)
 
-    def __init__(self, read_source, unlock_locked, parent=None):
+    def __init__(self, read_source, select_on_click, unlock_locked, parent=None):
         super().__init__(parent)
         QtCompat.loadUi(UI_PATH, self)
         translate.bind_ui(self)
         self._read_source = read_source
+        self._select_on_click = select_on_click
         self._unlock_locked = unlock_locked
         self._driver_plug = None
         self._sources = []
@@ -142,6 +145,7 @@ class AdvancedPage(QtWidgets.QWidget):
         self._btn_check_all.clicked.connect(self._on_check_all)
         self._btn_uncheck_all.clicked.connect(self._on_uncheck_all)
         self._btn_clear.clicked.connect(self._on_clear)
+        self._table.clicked.connect(self._on_row_clicked)
         self._btn_convert.clicked.connect(self._on_convert)
         self._model.dataChanged.connect(self._update_summary)
 
@@ -168,6 +172,15 @@ class AdvancedPage(QtWidgets.QWidget):
 
     def _on_clear(self, _checked=False):
         self._clear()
+
+    def _on_row_clicked(self, index):
+        if not self._select_on_click.isChecked():
+            return
+
+        plug = self._model.get_row(index.row()).plug
+        warning = select_nodes([plug.partition(".")[0]])
+        if warning is not None:
+            self.messageChanged.emit(warning, True)
 
     def _on_scene_changed(self):
         self._clear()
