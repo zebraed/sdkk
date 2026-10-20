@@ -237,6 +237,7 @@ def convert_animation_to_driven_keys(
             raise ValueError(f"{plug}: {exc}") from exc
 
     created = []
+    replaced = []
     skipped = []
     failed = []
     warnings = []
@@ -252,6 +253,7 @@ def convert_animation_to_driven_keys(
                 animation.restore_animation(connection)
 
         created.extend(result.created)
+        replaced.extend(result.replaced)
         skipped.extend(result.skipped)
         failed.extend(result.failed)
         warnings.extend(result.warnings)
@@ -272,6 +274,7 @@ def convert_animation_to_driven_keys(
         skipped=tuple(skipped),
         failed=tuple(failed),
         warnings=tuple(warnings),
+        replaced=tuple(replaced),
     )
     return _log_apply_result(label, result)
 
@@ -1055,14 +1058,18 @@ def _list_blend_nodes(key):
 
 def _log_apply_result(label, result):
     logger.info(
-        "%s: %d created, %d skipped, %d failed",
+        "%s: %d created, %d replaced, %d skipped, %d failed",
         label,
-        len(result.created),
+        len(result.created) - len(result.replaced),
+        len(result.replaced),
         len(result.skipped),
         len(result.failed),
     )
     for curve in result.created:
-        logger.info("Created driven key %s", curve)
+        if curve in result.replaced:
+            logger.info("Replaced driven key %s", curve)
+        else:
+            logger.info("Created driven key %s", curve)
 
     for item in result.skipped:
         level = (

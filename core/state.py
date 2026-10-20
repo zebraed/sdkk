@@ -98,16 +98,18 @@ class ApplyResult:
     適用結果
 
     Attributes:
-        created (tuple[str, ...]): 作成したanimCurveノード名
+        created (tuple[str, ...]): 作成したanimCurveノード名。既存のカーブを置き換えたものも含む
         skipped (tuple[PlanItem, ...]): 計画の時点で適用できなかった項目
         failed (tuple[tuple[PlanItem, str], ...]): 適用中に失敗した項目とエラー内容
         warnings (tuple[str, ...]): 作成はできたが、記録どおりの構成にならなかった内容
+        replaced (tuple[str, ...]): createdのうち、すでにあったカーブを置き換えたもの
     """
 
     created: tuple[str, ...]
     skipped: tuple[PlanItem, ...]
     failed: tuple[tuple[PlanItem, str], ...]
     warnings: tuple[str, ...]
+    replaced: tuple[str, ...] = ()
 
     def __repr__(self):
         return (

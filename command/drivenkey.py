@@ -642,6 +642,7 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
         ApplyResult: 結果
     """
     created = []
+    replaced = []
     skipped = []
     failed = []
     warnings = []
@@ -660,6 +661,9 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
                 continue
 
             created.append(curve)
+            if item.status is PlanStatus.REPLACE:
+                replaced.append(curve)
+
             warnings.extend(f"{curve}: {warning}" for warning in item_warnings)
 
     return ApplyResult(
@@ -667,6 +671,7 @@ def apply_plan(items, linear_unit=None, angle_unit=None):
         skipped=tuple(skipped),
         failed=tuple(failed),
         warnings=tuple(warnings),
+        replaced=tuple(replaced),
     )
 
 
