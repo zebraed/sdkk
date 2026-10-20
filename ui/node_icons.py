@@ -3,7 +3,7 @@ Icons of Maya nodes, the same as the Outliner shows.
 
 アウトライナーに出るのと同じ、Mayaのノードのアイコン
 """
-from Qt import QtGui
+from ..vendor.Qt import QtGui
 
 _cache = {}
 

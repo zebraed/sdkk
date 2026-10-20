@@ -5,18 +5,17 @@ Advancedタブ（使用頻度の低い、技術的な操作。今はアニメー
 """
 import os
 
-from Qt import QtCompat, QtCore, QtWidgets
+from ..vendor.Qt import QtCompat, QtCore, QtWidgets
 
 from .. import ops, service
 from ..i18n import tr
 from ..core.state import ConflictPolicy
 from . import translate
 from .command_print import format_call, print_commands, shorten_name, shorten_names
-from .convert_row_model import ConvertRow, ConvertRowModel
 from .maya_events import SceneWatcher
+from .models.tables import ConvertRow, ConvertRowModel
 from .node_selection import select_nodes
-from .widgets.collapsible_group import CollapsibleGroup
-from .widgets.empty_hint import EmptyHint
+from .widgets.common import CollapsibleGroup, EmptyHint
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "advanced_page.ui")
 
@@ -238,7 +237,7 @@ class AdvancedPage(QtWidgets.QWidget):
         if total == 0:
             return
 
-        checked = self._model.list_checked_rows()
+        checked = self._model.list_checked()
         convertible = [row for row in checked if row.applicable]
         translate.bind(
             self._label_summary, "setText", "{checked} / {total} checked · {convertible} to convert",
@@ -258,7 +257,7 @@ class AdvancedPage(QtWidgets.QWidget):
 
     def _on_convert(self, _checked=False):
         plugs = []
-        for row in self._model.list_checked_rows():
+        for row in self._model.list_checked():
             if row.applicable:
                 plugs.append(row.plug)
 

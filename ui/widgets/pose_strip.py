@@ -3,7 +3,7 @@ Pose strip: the driver values that have keys, drawn as markers on one line.
 
 キーがあるドライバー値を、1本の線上のマーカーとして描くポーズストリップ
 """
-from Qt import QtCore, QtGui, QtWidgets
+from ...vendor.Qt import QtCore, QtGui, QtWidgets
 
 from ...i18n import tr
 

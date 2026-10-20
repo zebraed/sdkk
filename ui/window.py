@@ -1,7 +1,7 @@
 import functools
 import os
 
-from Qt import QtCompat, QtCore, QtWidgets
+from ..vendor.Qt import QtCompat, QtCore, QtWidgets
 
 from maya import OpenMayaUI as omui
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
@@ -27,6 +27,7 @@ from .manage_dialog import ManageDialog
 from .manage_page import ManagePage
 from .mirror_page import MirrorPage
 from .setup_page import SetupPage
+from .widgets.common import ElidedLabel
 from .window_icon import make_window_icon
 
 RESOURCE_DIR = os.path.join(os.path.dirname(__file__), "resources")
@@ -64,7 +65,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         self.setWindowFlags(QtCore.Qt.Window)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
-        self._label_context = QtWidgets.QLabel()
+        self._label_context = ElidedLabel()
         self._label_context.setObjectName("label_context")
         self._label_context.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         self._status_bar = self.findChild(QtWidgets.QStatusBar, "statusbar")

@@ -22,7 +22,7 @@ Every operation is a single undo step, and every GUI action prints the equivalen
 | Item | Notes |
 | --- | --- |
 | **Maya** | 2023 or later (Python 3.9+). |
-| **Qt.py** | Required for the GUI. It is not bundled, so it must be importable from Maya. |
+| **Qt.py** | Bundled in `vendor/` (2.0.7). Nothing to install. |
 
 ## Installation
 
@@ -195,3 +195,5 @@ sdkk.cleanup_driven_keys()
 ## License
 
 [MIT License](LICENSE)
+
+sdkk bundles [Qt.py](https://github.com/mottosso/Qt.py) (MIT License, Copyright (c) 2016 Marcus Ottosson) in `vendor/`. Its license is in [vendor/Qt.py.LICENSE](vendor/Qt.py.LICENSE).

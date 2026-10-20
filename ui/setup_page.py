@@ -6,7 +6,7 @@ SDK Setupタブ（ドライバー、ドリブンのノードとアトリビュ�
 import functools
 import os
 
-from Qt import QtCompat, QtCore, QtGui, QtWidgets
+from ..vendor.Qt import QtCompat, QtCore, QtGui, QtWidgets
 
 from .. import gui_ops, ops, service
 from ..core.history import push_history
@@ -14,13 +14,12 @@ from ..i18n import tr
 from ..core.setup_state import AXES, TRANSFORM_KINDS, DriverSpec, SetupState
 from ..core.state import Role
 from . import translate
-from .driven_node_model import DrivenNodeModel
 from .command_print import format_call, print_commands, shorten_name, shorten_names
 from .maya_events import SceneWatcher
+from .models.tables import DrivenNodeModel
 from .node_icons import get_node_icon
 from .widgets.attr_picker import AttrPicker
-from .widgets.collapsible_group import CollapsibleGroup
-from .widgets.empty_hint import EmptyHint
+from .widgets.common import CollapsibleGroup, ElidedLabel, EmptyHint
 from .widgets.pose_strip import PoseStripWidget
 from .widgets.preset_buttons import PresetButtonRow
 
@@ -216,6 +215,8 @@ class SetupPage(QtWidgets.QWidget):
                 self._driven_cells[attr] = find(QtWidgets.QToolButton, f"btn_driven_{key}")
 
     def _setup_widgets(self):
+        self._label_driver_node = _replace_with_elided(self._label_driver_node)
+        self._label_driven_node = _replace_with_elided(self._label_driven_node)
         self._group_driver = self._wrap_group("holder_driver", "widget_driver_body", "DRIVER")
         self._group_driven = self._wrap_group("holder_driven", "widget_driven_body", "DRIVEN")
 
@@ -1165,6 +1166,15 @@ def _count_text(count, singular, plural):
         return tr(singular, count=count)
 
     return tr(plural, count=count)
+
+
+def _replace_with_elided(label):
+    elided = ElidedLabel()
+    elided.setObjectName(label.objectName())
+    elided.setText(label.text())
+    label.parentWidget().layout().replaceWidget(label, elided)
+    label.deleteLater()
+    return elided
 
 
 def _set_node_label(label, text, selectable):

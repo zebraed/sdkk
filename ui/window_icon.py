@@ -3,7 +3,7 @@ Builds the window icon from the SVG logo.
 
 SVGのロゴからウィンドウアイコンを作る
 """
-from Qt import QtCore, QtGui, QtSvg
+from ..vendor.Qt import QtCore, QtGui, QtSvg
 
 ICON_SIZES = (16, 24, 32)
 

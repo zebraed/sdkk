@@ -1,4 +1,4 @@
-from Qt import QtCompat, QtCore, QtWidgets
+from ..vendor.Qt import QtCompat, QtCore, QtWidgets
 
 from .. import i18n
 from ..i18n import tr

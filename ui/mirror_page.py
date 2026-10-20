@@ -6,7 +6,7 @@ Mirrorタブ（名前の規則で、ドリブンキーを反対側へ1本ずつ�
 import os
 import re
 
-from Qt import QtCompat, QtCore, QtWidgets
+from ..vendor.Qt import QtCompat, QtCore, QtWidgets
 
 from .. import ops, service
 from ..i18n import tr
@@ -16,10 +16,9 @@ from ..core.state import ConflictPolicy, Role
 from . import translate
 from .command_print import format_call, print_commands
 from .maya_events import SceneWatcher
+from .models.tables import MirrorRow, MirrorRowModel, is_fixable
 from .node_selection import select_nodes
-from .mirror_row_model import MirrorRow, MirrorRowModel, is_fixable
-from .widgets.collapsible_group import CollapsibleGroup
-from .widgets.empty_hint import EmptyHint
+from .widgets.common import CollapsibleGroup, EmptyHint
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "mirror_page.ui")
 DEFAULT_DRIVEN_INVERT = ("translateX", "translateY", "translateZ")
@@ -308,7 +307,7 @@ class MirrorPage(QtWidgets.QWidget):
         if total == 0:
             return
 
-        checked = self._model.list_checked_rows()
+        checked = self._model.list_checked()
         fixable = [row for row in checked if is_fixable(row)]
         translate.bind(
             self._label_summary, "setText", "{checked} / {total} checked · {fixable} to mirror",
@@ -375,7 +374,7 @@ class MirrorPage(QtWidgets.QWidget):
 
     def _on_mirror(self, _checked=False):
         rows = []
-        for row in self._model.list_checked_rows():
+        for row in self._model.list_checked():
             if is_fixable(row):
                 rows.append(row)
 

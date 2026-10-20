@@ -5,7 +5,7 @@ Manageタブ
 """
 import os
 
-from Qt import QtCompat, QtCore, QtWidgets
+from ..vendor.Qt import QtCompat, QtCore, QtWidgets
 
 from .. import ops, service
 from ..i18n import tr
@@ -13,12 +13,10 @@ from ..core.serialize import read_document
 from ..core.state import ConflictPolicy, Role
 from . import translate
 from .command_print import format_call, print_commands
-from .export_target_model import ExportTargetModel
-from .import_item_model import ImportItemModel
 from .maya_events import SceneWatcher
+from .models.tables import ExportTargetModel, ImportItemModel
 from .node_selection import select_nodes
-from .widgets.collapsible_group import CollapsibleGroup
-from .widgets.empty_hint import EmptyHint
+from .widgets.common import CollapsibleGroup, EmptyHint
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "manage_page.ui")
 _PARTNER_TITLES = {Role.DRIVER: "Drivens", Role.DRIVEN: "Drivers"}
@@ -195,7 +193,8 @@ class ManagePage(QtWidgets.QWidget):
         self._import_model.dataChanged.connect(self._update_import_summary)
 
     def _clear(self):
-        self._model.set_targets([], _PARTNER_TITLES[self._role])
+        self._model.set_partner_title(_PARTNER_TITLES[self._role])
+        self._model.set_rows([])
         translate.bind(self._label_summary, "setText", "Not loaded")
         self._btn_export.setEnabled(False)
 
@@ -207,7 +206,7 @@ class ManagePage(QtWidgets.QWidget):
         self._path = None
         translate.bind(self._label_file, "setText", "(no file)")
         self._label_file.setToolTip("")
-        self._import_model.set_items([], keep_checked=False)
+        self._import_model.set_rows([])
         translate.bind(self._label_import_summary, "setText", "Not loaded")
         self._btn_import.setEnabled(False)
 
@@ -228,11 +227,11 @@ class ManagePage(QtWidgets.QWidget):
 
             locked = service.list_locked_plugs(plugs)
 
-        self._import_model.set_items(items, keep_checked, locked)
+        self._import_model.set_rows(items, keep_checked, locked)
         self._update_import_summary()
 
     def _update_import_summary(self, *_args):
-        checked = len(self._import_model.list_checked_items())
+        checked = len(self._import_model.list_checked())
         total = self._import_model.rowCount()
         translate.bind(
             self._label_import_summary, "setText", "{checked} / {total} driven keys",
@@ -259,7 +258,7 @@ class ManagePage(QtWidgets.QWidget):
 
     def _on_import(self, _checked=False):
         self._replan(keep_checked=True)
-        items = self._import_model.list_checked_items()
+        items = self._import_model.list_checked()
         result = ops.apply_plan(items, self._document.linear_unit, self._document.angle_unit)
         self._replan(keep_checked=True)
         self._print_import_command()
@@ -277,10 +276,10 @@ class ManagePage(QtWidgets.QWidget):
     def _print_import_command(self):
         policy = self._combo_policy.currentData()
         unlock = self._unlock_locked.isChecked()
-        rows = self._import_model.list_checked_rows()
+        items = self._import_model.list_checked()
         kwargs = {"path": self._path}
-        if len(rows) != self._import_model.rowCount():
-            names = [self._import_model.get_item(row).data.name for row in rows]
+        if len(items) != self._import_model.rowCount():
+            names = [item.data.name for item in items]
             if None in names:
                 print("# " + tr(
                     "The driven keys in the file have no names, so this import cannot be written as one command",
@@ -299,7 +298,8 @@ class ManagePage(QtWidgets.QWidget):
 
     def _load(self, selected_only):
         targets = service.list_export_targets(self._role, selected_only)
-        self._model.set_targets(targets, _PARTNER_TITLES[self._role])
+        self._model.set_partner_title(_PARTNER_TITLES[self._role])
+        self._model.set_rows(targets)
         self._table.resizeColumnsToContents()
         if not targets:
             # 側と範囲の4通りの原文を、そのままカタログに持つ
@@ -315,8 +315,11 @@ class ManagePage(QtWidgets.QWidget):
         self._update_summary()
 
     def _update_summary(self, *_args):
-        checked = len(self._model.list_checked_uuids())
-        keys = self._model.count_checked_keys()
+        targets = self._model.list_checked()
+        checked = len(targets)
+        keys = 0
+        for target in targets:
+            keys += target.keys - target.skipped
         translate.bind(
             self._label_summary, "setText", "{checked} / {total} nodes · {keys} driven keys",
             checked=checked, total=self._model.rowCount(), keys=keys,
@@ -345,13 +348,13 @@ class ManagePage(QtWidgets.QWidget):
 
     def _on_row_clicked(self, index):
         if self._select_on_click.isChecked():
-            self._select_nodes([self._model.get_node_name(index.row())])
+            self._select_nodes([self._model.get_row(index.row()).info.name])
 
     def _on_import_row_clicked(self, index):
         if not self._select_on_click.isChecked():
             return
 
-        data = self._import_model.get_item(index.row()).data
+        data = self._import_model.get_row(index.row()).data
         self._select_nodes([data.driver.node, data.driven.node])
 
     def _select_nodes(self, names):
@@ -360,7 +363,8 @@ class ManagePage(QtWidgets.QWidget):
             self.messageChanged.emit(warning, True)
 
     def _on_export(self, _checked=False):
-        names = service.list_node_names(self._model.list_checked_uuids())
+        uuids = [target.info.uuid for target in self._model.list_checked()]
+        names = service.list_node_names(uuids)
         if not names:
             self.messageChanged.emit("⚠ " + tr("The checked nodes no longer exist. Load again"), True)
             return

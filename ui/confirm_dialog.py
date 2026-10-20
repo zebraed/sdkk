@@ -3,7 +3,7 @@ A confirmation dialog that always shows the list of what is affected.
 
 対象の一覧を常に表示する確認ダイアログ
 """
-from Qt import QtWidgets
+from ..vendor.Qt import QtWidgets
 
 from ..i18n import tr
 

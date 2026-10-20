@@ -3,7 +3,7 @@ Attribute picker: a button that opens a searchable popup list.
 
 検索できるポップアップの一覧を開くボタン
 """
-from Qt import QtCore, QtGui, QtWidgets
+from ...vendor.Qt import QtCore, QtGui, QtWidgets
 
 from ...i18n import tr
 from .. import translate

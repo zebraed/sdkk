@@ -7,7 +7,7 @@ import functools
 import math
 import numbers
 
-from Qt import QtCore, QtGui, QtWidgets
+from ...vendor.Qt import QtCore, QtGui, QtWidgets
 
 from .. import translate
 

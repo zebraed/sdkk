@@ -2,7 +2,7 @@
 
 ManageタブのExportまたはImportを再利用する非モーダルダイアログ
 """
-from Qt import QtCore, QtWidgets
+from ..vendor.Qt import QtCore, QtWidgets
 
 from . import translate
 from .manage_page import ManagePage
