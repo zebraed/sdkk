@@ -9,7 +9,7 @@ import os
 from ..vendor.Qt import QtCompat, QtCore, QtGui, QtWidgets
 
 from .. import gui_ops, ops, service
-from ..core.history import push_history
+from ..core.history import DEFAULT_LIMIT, MAX_LIMIT, push_history
 from ..i18n import tr
 from ..core.setup_state import AXES, TRANSFORM_KINDS, DriverSpec, SetupState
 from ..core.state import Role
@@ -67,6 +67,7 @@ class SetupPage(QtWidgets.QWidget):
         self._tracked = ()
         self._scene_reader = service.SetupSceneReader()
         self._history = service.read_history()
+        self._history_limit = DEFAULT_LIMIT
         self._target_entries = ()
         self._cleared_key = None
 
@@ -111,6 +112,7 @@ class SetupPage(QtWidgets.QWidget):
             "driven_expanded": self._group_driven.is_expanded,
             "driver_presets": self._presets.values(),
             "driven_edit": self._check_driven_edit.isChecked(),
+            "history_limit": self._history_limit,
         }
 
     def apply_settings(self, settings):
@@ -133,6 +135,10 @@ class SetupPage(QtWidgets.QWidget):
         driven_edit = settings.get("driven_edit")
         if isinstance(driven_edit, bool):
             self._check_driven_edit.setChecked(driven_edit)
+
+        limit = settings.get("history_limit")
+        if isinstance(limit, int) and not isinstance(limit, bool) and 1 <= limit <= MAX_LIMIT:
+            self.set_history_limit(limit)
 
     def detach_pose_area(self):
         """Take the pose area out of this page, so that the window can place it outside the tabs.
@@ -860,20 +866,47 @@ class SetupPage(QtWidgets.QWidget):
         self._select_scene_node(info.name)
 
     # --- history ---
-    def list_history(self):
-        """List the history of driver and driven sets, newest first.
+    @property
+    def history_limit(self):
+        """int: The number of sets shown in the history.
 
-        ドライバーとドリブンの組の履歴を、新しい順に返す
+        履歴に出す組の数
+        """
+        return self._history_limit
+
+    def set_history_limit(self, limit):
+        """Set the number of sets shown in the history.
+
+        履歴に出す組の数を設定する
+
+        The older sets are only hidden here, and are dropped from the saved
+        history the next time a set is added, so that lowering the limit by
+        mistake can be undone.
+
+        ここでは古い組を隠すだけで、保存している履歴からは、次に組が加わったときに外す
+        誤って上限を下げても、戻せるようにするため
+
+        Args:
+            limit (int): 1からMAX_LIMITまでの件数
+        """
+        self._history_limit = limit
+        self._render_target()
+
+    def list_history(self):
+        """List the history of driver and driven sets, newest first, up to the limit.
+
+        ドライバーとドリブンの組の履歴を、新しい順に上限まで返す
 
         Returns:
-            tuple[HistoryEntry, ...]: 履歴
+            tuple[tuple[HistoryEntry, bool], ...]: （項目, 今のシーンで使えるか）
         """
-        history = service.refresh_history(self._history)
+        listing = service.refresh_history(self._history[:self._history_limit])
+        history = tuple(entry for entry, _available in listing) + self._history[self._history_limit:]
         if history != self._history:
             self._history = history
             service.write_history(history)
 
-        return history
+        return listing
 
     def clear_history(self):
         """Clear the whole history.
@@ -906,7 +939,7 @@ class SetupPage(QtWidgets.QWidget):
             self._notify("⚠ " + tr("Not found in the scene: {names}", names=names))
 
     def _on_target_popup(self):
-        self.list_history()
+        self._fill_target(self.list_history())
         self._render_target()
 
     def _on_target_activated(self, index):
@@ -925,13 +958,21 @@ class SetupPage(QtWidgets.QWidget):
 
         return info.name
 
+    def _fill_target(self, listing):
+        combo = self._combo_target
+        combo.clear()
+        for row, (entry, available) in enumerate(listing):
+            combo.addItem(entry.label)
+            combo.model().item(row).setEnabled(available)
+
+        self._target_entries = tuple(entry for entry, _available in listing)
+
     def _render_target(self):
         combo = self._combo_target
-        if self._history != self._target_entries:
-            self._target_entries = self._history
-            combo.clear()
-            for entry in self._history:
-                combo.addItem(entry.label)
+        shown = self._history[:self._history_limit]
+        if shown != self._target_entries:
+            # 使えるかはシーンを調べないと分からないため、一覧を開くときに_on_target_popupで決める
+            self._fill_target([(entry, True) for entry in shown])
 
         keys = [entry.key for entry in self._target_entries]
         driver_node = self._current_driver_node()
@@ -942,11 +983,11 @@ class SetupPage(QtWidgets.QWidget):
         if not self._history:
             return
 
-        entries = service.refresh_history(self._history[:1])
-        if not entries:
+        entry, available = service.refresh_history(self._history[:1])[0]
+        if not available:
             return
 
-        state, missing = service.restore_state(entries[0])
+        state, missing = service.restore_state(entry)
         if missing:
             return
 
@@ -963,7 +1004,7 @@ class SetupPage(QtWidgets.QWidget):
             return
 
         self._cleared_key = None
-        history = push_history(self._history, entry)
+        history = push_history(self._history, entry, self._history_limit)
         if history != self._history:
             self._history = history
             service.write_history(history)

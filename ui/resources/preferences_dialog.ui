@@ -173,6 +173,80 @@
          </item>
         </layout>
        </widget>
+       <widget class="QWidget" name="page_history">
+        <layout class="QVBoxLayout" name="verticalLayout_history">
+         <property name="spacing">
+          <number>12</number>
+         </property>
+         <property name="leftMargin">
+          <number>12</number>
+         </property>
+         <property name="topMargin">
+          <number>12</number>
+         </property>
+         <property name="rightMargin">
+          <number>12</number>
+         </property>
+         <property name="bottomMargin">
+          <number>12</number>
+         </property>
+         <item>
+          <widget class="QGroupBox" name="group_history">
+           <property name="title">
+            <string>Driver and Driven History</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_history_limit">
+            <item>
+             <widget class="QLabel" name="label_history_limit">
+              <property name="text">
+               <string>Maximum Entries :</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spin_history_limit">
+              <property name="toolTip">
+               <string>The number of sets kept in the history. Lowering it hides the older sets, which are dropped the next time a set is added</string>
+              </property>
+              <property name="minimum">
+               <number>1</number>
+              </property>
+              <property name="maximum">
+               <number>100</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="spacer_history_limit">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+              <property name="sizeHint" stdset="0">
+               <size>
+                <width>40</width>
+                <height>20</height>
+               </size>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="spacer_history">
+           <property name="orientation">
+            <enum>Qt::Vertical</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>0</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
        <widget class="QWidget" name="page_language">
         <layout class="QVBoxLayout" name="verticalLayout_language">
          <property name="spacing">

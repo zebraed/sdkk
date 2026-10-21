@@ -6,6 +6,7 @@ Maya-free history of the driver and driven sets that keys were set on.
 from dataclasses import dataclass
 
 DEFAULT_LIMIT = 10
+MAX_LIMIT = 100
 
 
 @dataclass(frozen=True)

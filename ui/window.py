@@ -192,7 +192,8 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
     def _show_preferences(self, _checked=False):
         if self._preferences is None:
-            self._preferences = PreferencesDialog(self._options, self)
+            self._preferences = PreferencesDialog(self._options, self._page.history_limit, self)
+            self._preferences.historyLimitChanged.connect(self._page.set_history_limit)
             self._preferences.finished.connect(self._on_preferences_closed)
 
         self._preferences.show()
@@ -208,8 +209,9 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         if not entries:
             self._menu_history.addAction(tr("(empty)")).setEnabled(False)
 
-        for entry in entries:
+        for entry, available in entries:
             action = self._menu_history.addAction(entry.label)
+            action.setEnabled(available)
             action.triggered.connect(functools.partial(self._on_history_picked, entry))
 
         self._menu_history.addSeparator()

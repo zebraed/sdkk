@@ -11,7 +11,7 @@ from typing import Optional
 from maya import cmds
 
 from .command import animation, drivenkey, scene
-from .core.history import HistoryEntry, parse_history
+from .core.history import MAX_LIMIT, HistoryEntry, parse_history
 from .i18n import tr
 from .core.model import Plug
 from .core.pose_keys import PoseSummary, summarize_pose_keys
@@ -1024,6 +1024,13 @@ def read_history():
 
     保存してあるドライバーとドリブンの組の履歴を読む
 
+    Up to MAX_LIMIT entries are read, not the limit set by the user, so
+    that lowering the limit only hides the older sets until the next one
+    is added.
+
+    ユーザーが設定した上限ではなく、MAX_LIMIT件まで読む。上限を下げても、次の組が加わるまでは
+    古い組を隠すだけにするため
+
     Returns:
         tuple[HistoryEntry, ...]: 新しい順の履歴。保存がない、または読めない場合は空
     """
@@ -1031,7 +1038,7 @@ def read_history():
     if not isinstance(items, list):
         return ()
 
-    return parse_history(items)
+    return parse_history(items, MAX_LIMIT)
 
 
 def write_history(entries):
@@ -1084,29 +1091,39 @@ def build_history_entry(state):
 
 
 def refresh_history(entries):
-    """Bring the history up to date with the scene, and drop the sets that are gone.
+    """Bring the history up to date with the scene, and tell which sets can be used in it.
 
-    履歴をシーンの現在の状態に合わせ、なくなった組は外す
+    履歴をシーンの現在の状態に合わせ、今のシーンで使える組かどうかを添えて返す
 
-    Each entry is rebuilt from the driven keys the driver drives now, so
-    driven nodes and attributes that have been deleted are not kept. An
-    entry whose driver node is gone, or whose driver drives nothing any
-    more, is dropped. If the driver attribute of an entry drives nothing
-    now but another attribute of the node does, that one is used.
+    Each entry that can be used is rebuilt from the driven keys the driver
+    drives now, so driven nodes and attributes that have been deleted are
+    not kept. If the driver attribute of an entry drives nothing now but
+    another attribute of the node does, that one is used. An entry whose
+    driver node is not in the scene, or whose driver drives nothing, is
+    kept as it is, since the history is shared by every scene and the set
+    may be in another one.
 
-    各項目は、ドライバーが今動かしているドリブンキーから作り直すため、削除したドリブンのノードや
-    アトリビュートは残らない。ドライバーのノードがない、またはドライバーが何も動かしていない項目は外す
-    項目のドライバーのアトリビュートが今は何も動かしておらず、同じノードの別のアトリビュートが
-    動かしている場合は、そちらを使う
+    使える項目は、ドライバーが今動かしているドリブンキーから作り直すため、削除したドリブンのノードや
+    アトリビュートは残らない。項目のドライバーのアトリビュートが今は何も動かしておらず、
+    同じノードの別のアトリビュートが動かしている場合は、そちらを使う
+    ドライバーのノードがシーンにない、またはドライバーが何も動かしていない項目は、そのまま残す
+    履歴はすべてのシーンで共有しており、別のシーンにある組かもしれないため
 
     Args:
         entries (Iterable[HistoryEntry]): 新しい順の履歴
 
     Returns:
-        tuple[HistoryEntry, ...]: 更新した履歴。順序は保つ
+        tuple[tuple[HistoryEntry, bool], ...]: （項目, 今のシーンで使えるか）。順序は保つ
     """
-    refreshed = (_refresh_history_entry(entry) for entry in entries)
-    return tuple(entry for entry in refreshed if entry is not None)
+    listing = []
+    for entry in entries:
+        refreshed = _refresh_history_entry(entry)
+        if refreshed is None:
+            listing.append((entry, False))
+        else:
+            listing.append((refreshed, True))
+
+    return tuple(listing)
 
 
 def restore_state(entry):

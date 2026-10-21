@@ -13,7 +13,7 @@ from ..i18n import tr
 from . import translate
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "preferences_dialog.ui")
-_CATEGORIES = ("General", "Slider", "Language")
+_CATEGORIES = ("General", "Slider", "History", "Language")
 
 
 class PreferencesDialog(QtWidgets.QDialog):
@@ -24,10 +24,16 @@ class PreferencesDialog(QtWidgets.QDialog):
     Args:
         options (Mapping[str, QtWidgets.QAction]): 設定名とチェック付きアクション。
             .uiの"check_{設定名}"のチェックボックスと結ぶ
+        history_limit (int): 履歴に出す組の数の現在値
         parent (Optional[QtWidgets.QWidget]): 親ウィンドウ
+
+    Signals:
+        historyLimitChanged (int):
     """
 
-    def __init__(self, options, parent=None):
+    historyLimitChanged = QtCore.Signal(int)
+
+    def __init__(self, options, history_limit, parent=None):
         super().__init__(parent)
         QtCompat.loadUi(UI_PATH, self)
         translate.bind_ui(self)
@@ -49,6 +55,10 @@ class PreferencesDialog(QtWidgets.QDialog):
             check.setChecked(action.isChecked())
             check.toggled.connect(action.setChecked)
             action.toggled.connect(check.setChecked)
+
+        spin = self.findChild(QtWidgets.QSpinBox, "spin_history_limit")
+        spin.setValue(history_limit)
+        spin.valueChanged.connect(self.historyLimitChanged)
 
         self._language_radios = {}
         layout = self.findChild(QtWidgets.QVBoxLayout, "verticalLayout_language_radios")

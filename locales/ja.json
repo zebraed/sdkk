@@ -189,6 +189,8 @@
   "Apply": "適用",
   "Key Slider": "キースライダー",
   "Display Language": "表示言語",
+  "Maximum Entries :": "最大件数 :",
+  "The number of sets kept in the history. Lowering it hides the older sets, which are dropped the next time a set is added": "履歴に残す組の数。下げると古い組は隠れ、次に組が加わったときに履歴から外れる",
   "Close": "閉じる",
   "Snap the key slider to a key near the mouse while dragging": "ドラッグ中、キースライダーをマウスの近くのキーに吸い付かせる",
   "Driver and Driven History": "ドライバーとドリブンの履歴",
