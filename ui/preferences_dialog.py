@@ -11,12 +11,13 @@ from ..vendor.Qt import QtCompat, QtCore, QtWidgets
 from .. import i18n
 from ..i18n import tr
 from . import translate
+from .base_dialog import BaseDialog
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "preferences_dialog.ui")
 _CATEGORIES = ("General", "Slider", "History", "Language")
 
 
-class PreferencesDialog(QtWidgets.QDialog):
+class PreferencesDialog(BaseDialog):
     """Show the options as check boxes
 
     ウィンドウのチェック付きアクションと同期したチェックボックスで、設定を表示する
@@ -37,8 +38,6 @@ class PreferencesDialog(QtWidgets.QDialog):
         super().__init__(parent)
         QtCompat.loadUi(UI_PATH, self)
         translate.bind_ui(self)
-        self.setWindowModality(QtCore.Qt.NonModal)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
         self._list_category = self.findChild(QtWidgets.QListWidget, "list_category")
         self._stack = self.findChild(QtWidgets.QStackedWidget, "stack_pages")

@@ -6,9 +6,10 @@ A confirmation dialog that always shows the list of what is affected.
 from ..vendor.Qt import QtWidgets
 
 from ..i18n import tr
+from .base_dialog import BaseDialog
 
 
-class ConfirmListDialog(QtWidgets.QDialog):
+class ConfirmListDialog(BaseDialog):
     """Asks Yes or No, with the list of what is affected below the message. No is the default.
 
     メッセージの下に、対象の一覧を出して、はい・いいえを確認する。既定は「いいえ」
@@ -21,7 +22,7 @@ class ConfirmListDialog(QtWidgets.QDialog):
     """
 
     def __init__(self, title, message, lines, parent=None):
-        super().__init__(parent)
+        super().__init__(parent, modal=True)
         self.setWindowTitle(title)
         self.resize(480, 300)
 

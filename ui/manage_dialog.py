@@ -2,10 +2,11 @@
 
 ManageタブのExportまたはImportを再利用する非モーダルダイアログ
 """
-from ..vendor.Qt import QtCore, QtWidgets
+from ..vendor.Qt import QtWidgets
 
 from .. import service
 from . import translate
+from .base_dialog import BaseDialog
 from .manage_page import ManagePage
 
 
@@ -15,7 +16,7 @@ _TITLES = {
 }
 
 
-class ManageDialog(QtWidgets.QDialog):
+class ManageDialog(BaseDialog):
     """Show one ManagePage section without blocking other windows.
 
     ほかのウィンドウを操作できる状態で、ManagePageの1セクションを表示する
@@ -33,8 +34,6 @@ class ManageDialog(QtWidgets.QDialog):
 
         super().__init__(parent)
         translate.bind(self, "setWindowTitle", _TITLES[section])
-        self.setWindowModality(QtCore.Qt.NonModal)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.resize(620, 380)
 
         self.page = ManagePage(select_on_click, unlock_locked, self)

@@ -196,9 +196,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             self._preferences.historyLimitChanged.connect(self._page.set_history_limit)
             self._preferences.finished.connect(self._on_preferences_closed)
 
-        self._preferences.show()
-        self._preferences.raise_()
-        self._preferences.activateWindow()
+        self._preferences.present()
 
     def _on_preferences_closed(self, _result):
         self._preferences = None
@@ -316,9 +314,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             )
             self._manage_dialogs[section] = dialog
 
-        dialog.show()
-        dialog.raise_()
-        dialog.activateWindow()
+        dialog.present()
 
     def _on_manage_dialog_closed(self, section, dialog, _result):
         if self._manage_dialogs.get(section) is dialog:
