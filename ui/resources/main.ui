@@ -138,18 +138,24 @@
       <string>Language</string>
      </property>
     </widget>
-    <addaction name="act_select_on_click"/>
-    <addaction name="act_unlock_locked"/>
+    <addaction name="act_preferences"/>
     <addaction name="menu_language"/>
    </widget>
    <widget class="QMenu" name="menu_tools">
     <property name="title">
      <string>Tools</string>
     </property>
+    <widget class="QMenu" name="menu_delete">
+     <property name="title">
+      <string>Delete</string>
+     </property>
+     <addaction name="act_delete_selected_driven_keys"/>
+     <addaction name="act_delete_all_driven_keys"/>
+    </widget>
     <addaction name="act_export_driven_keys"/>
     <addaction name="act_import_driven_keys"/>
     <addaction name="separator"/>
-    <addaction name="act_delete_driven_keys"/>
+    <addaction name="menu_delete"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
     <property name="title">
@@ -163,6 +169,11 @@
    <addaction name="menuHelp"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
+  <action name="act_preferences">
+   <property name="text">
+    <string>Preferences...</string>
+   </property>
+  </action>
   <action name="act_select_on_click">
    <property name="checkable">
     <bool>true</bool>
@@ -172,6 +183,20 @@
    </property>
    <property name="text">
     <string>Select Node on Row Click</string>
+   </property>
+  </action>
+  <action name="act_snap_to_keys">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Snap Slider to Keys</string>
+   </property>
+   <property name="toolTip">
+    <string>Snap the key slider to a key near the mouse while dragging</string>
    </property>
   </action>
   <action name="act_unlock_locked">
@@ -193,12 +218,20 @@
     <string>Export Driven Key...</string>
    </property>
   </action>
-  <action name="act_delete_driven_keys">
+  <action name="act_delete_selected_driven_keys">
    <property name="text">
-    <string>Delete Driven Key...</string>
+    <string>Delete Selected Driven Key...</string>
    </property>
    <property name="toolTip">
     <string>Delete every driven key linked to the selected driver or driven nodes</string>
+   </property>
+  </action>
+  <action name="act_delete_all_driven_keys">
+   <property name="text">
+    <string>Delete All Driven Keys...</string>
+   </property>
+   <property name="toolTip">
+    <string>Delete every driven key in the scene</string>
    </property>
   </action>
   <action name="act_import_driven_keys">

@@ -3,7 +3,9 @@ Operations only the GUI needs. Not part of the public API, so not exported from 
 
 GUIだけが使う操作。公開APIではないため、パッケージ直下には公開しない
 """
-from maya import cmds
+import functools
+
+from maya import cmds, mel
 
 from .maya_utils import suspend_undo
 
@@ -14,7 +16,7 @@ def preview_driver_value(driver, value, held=None):
     スライダーのドラッグ中など、Undoに積まずにドライバーを指定の値へ動かす
 
     Args:
-        driver (str): ドライバーアトリビュート
+        driver (str): 動かすアトリビュート。ドライバー、またはその代わりに動かすコントロール
         value (float): 設定する値
         held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
             ドリブンキーに従って動いてしまうドリブンのポーズを保つために使う
@@ -33,7 +35,7 @@ def commit_driver_value(driver, start_value, value, held=None):
     preview_driver_valueで動かしたドライバーについて、1回分のUndoを残す
 
     Args:
-        driver (str): ドライバーアトリビュート
+        driver (str): 動かすアトリビュート。ドライバー、またはその代わりに動かすコントロール
         start_value (float): 動かし始める前の値
         value (float): 最終的な値
         held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
@@ -58,7 +60,7 @@ def apply_driver_preset(driver, value, held=None):
     現在の値は、描画済みの値ではなく、この関数を呼んだ時点で読み直す。連続してクリックしても積み上がる
 
     Args:
-        driver (str): ドライバーアトリビュート
+        driver (str): 動かすアトリビュート。ドライバー、またはその代わりに動かすコントロール
         value (float): プリセットの値。0以外は、現在の値に加える量（負なら減らす）
         held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
 
@@ -68,6 +70,34 @@ def apply_driver_preset(driver, value, held=None):
     target = 0.0 if value == 0 else cmds.getAttr(driver) + value
     cmds.setAttr(driver, target)
     _restore_values(held)
+
+
+def show_in_graph_editor(curve):
+    """Open the Graph Editor with the animCurve selected, pinned and framed, ready to edit its keys.
+
+    animCurveを選択してGraph Editorを開き、ピン留めして、キーを編集できるようカーブ全体を表示する
+
+    Args:
+        curve (str): animCurveノード名
+    """
+    cmds.select(curve, r=True)
+    mel.eval("GraphEditor")
+    cmds.evalDeferred(functools.partial(_pin_and_frame, curve), lp=True)
+
+
+def _pin_and_frame(curve):
+    panels = cmds.getPanel(sty="graphEditor")
+    if panels is None:
+        return
+
+    for panel in panels:
+        outliner = f"{panel}OutlineEd"
+        if cmds.outlinerEditor(outliner, ex=True):
+            cmds.outlinerEditor(outliner, e=True, pin=f"{curve}.input")
+
+        editor = f"{panel}GraphEd"
+        if cmds.animCurveEditor(editor, ex=True):
+            cmds.animCurveEditor(editor, e=True, la="all")
 
 
 def _restore_values(held):

@@ -246,6 +246,22 @@ class EmptyHint(QtWidgets.QLabel):
         self.setVisible(self._model.rowCount() == 0)
 
 
+class PopupComboBox(QtWidgets.QComboBox):
+    """A QComboBox that tells before its list opens, so that the items can be refilled.
+
+    一覧を開く直前に知らせるQComboBox。項目を最新の内容に詰め直すために使う
+
+    Signals:
+        popupAboutToShow: 一覧を開く直前
+    """
+
+    popupAboutToShow = QtCore.Signal()
+
+    def showPopup(self):  # pylint: disable=invalid-name
+        self.popupAboutToShow.emit()
+        super().showPopup()
+
+
 class ElidedLabel(QtWidgets.QLabel):
     """A QLabel whose text does not decide the minimum width of what it is in.
 

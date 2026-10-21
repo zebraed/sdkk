@@ -508,18 +508,36 @@ def delete_driven_keys(*nodes, role=Role.BOTH):
         [node for node in nodes if cmds.objExists(node)],
         role,
     )
-    for key in keys:
-        key.delete()
-
-    names = [key.curve for key in keys]
-    if names:
-        logger.info(
-            "Deleted %d driven key(s): %s",
-            len(names),
-            ", ".join(names),
-        )
-    else:
+    names = _delete_keys(keys)
+    if not names:
         logger.info("No driven keys found on: %s", ", ".join(nodes))
+
+    return names
+
+
+@undo_chunk
+def delete_all_driven_keys():
+    """Delete every driven key in the scene.
+
+    シーンのすべてのドリブンキーを削除する
+
+    Curves connected through a blendWeighted are deleted too, and a
+    blendWeighted left without inputs is removed.
+
+    blendWeightedを経由するカーブも削除し、入力がなくなったblendWeightedも消す
+
+    Returns:
+        list[str]: 削除したanimCurveノード名
+
+    Examples:
+        >>> import sdkk
+        >>> sdkk.delete_all_driven_keys()
+        ['jaw_ctl_rotateX_to_lip_L_jnt_translateY_animCurveUL',
+         'mouth_ctl_translateY_to_lip_R_jnt_translateY_animCurveUL']
+    """
+    names = _delete_keys(list_driven_keys())
+    if not names:
+        logger.info("No driven keys found in the scene")
 
     return names
 
@@ -1126,6 +1144,21 @@ def _log_mirror_check(items):
         )
 
     return items
+
+
+def _delete_keys(keys):
+    for key in keys:
+        key.delete()
+
+    names = [key.curve for key in keys]
+    if names:
+        logger.info(
+            "Deleted %d driven key(s): %s",
+            len(names),
+            ", ".join(names),
+        )
+
+    return names
 
 
 def _read_driven_keys(nodes, role):

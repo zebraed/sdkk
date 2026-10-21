@@ -19,7 +19,7 @@ from .maya_events import SceneWatcher
 from .models.tables import DrivenNodeModel
 from .node_icons import get_node_icon
 from .widgets.attr_picker import AttrPicker
-from .widgets.common import CollapsibleGroup, ElidedLabel, EmptyHint
+from .widgets.common import CollapsibleGroup, ElidedLabel, EmptyHint, PopupComboBox
 from .widgets.pose_strip import PoseStripWidget
 from .widgets.preset_buttons import PresetButtonRow
 
@@ -39,6 +39,7 @@ class SetupPage(QtWidgets.QWidget):
 
     Args:
         select_on_click (QtWidgets.QAction): 行クリックでMayaの選択を切り替えるかを決めるチェック付きアクション
+        snap_to_keys (QtWidgets.QAction): スライダーをキーに吸い付かせるかを決めるチェック付きアクション
         parent (Optional[QtWidgets.QWidget]): 親
 
     Signals:
@@ -47,11 +48,12 @@ class SetupPage(QtWidgets.QWidget):
 
     statusChanged = QtCore.Signal(str, bool)
 
-    def __init__(self, select_on_click, parent=None):
+    def __init__(self, select_on_click, snap_to_keys, parent=None):
         super().__init__(parent)
         QtCompat.loadUi(UI_PATH, self)
         translate.bind_ui(self)
         self._select_on_click = select_on_click
+        self._snap_to_keys = snap_to_keys
 
         self._state = SetupState()
         self._snapshot = None
@@ -65,6 +67,7 @@ class SetupPage(QtWidgets.QWidget):
         self._tracked = ()
         self._scene_reader = service.SetupSceneReader()
         self._history = service.read_history()
+        self._target_entries = ()
         self._cleared_key = None
 
         self._find_widgets()
@@ -191,6 +194,9 @@ class SetupPage(QtWidgets.QWidget):
         self._stack_driver = find(QtWidgets.QStackedWidget, "stack_driver_attr")
         self._label_driver_attr = find(QtWidgets.QLabel, "label_driver_attr")
         self._label_driver_value = find(QtWidgets.QLabel, "label_driver_value")
+        self._label_driver_control_caption = find(QtWidgets.QLabel, "label_driver_control_caption")
+        self._label_driver_control = find(QtWidgets.QLabel, "label_driver_control")
+        self._btn_set_control = find(QtWidgets.QPushButton, "btn_set_control")
 
         self._btn_add = find(QtWidgets.QPushButton, "btn_add")
         self._table = find(QtWidgets.QTableView, "table_driven_nodes")
@@ -229,8 +235,19 @@ class SetupPage(QtWidgets.QWidget):
         self._picker_driven.set_candidate_provider(self._list_driven_candidates)
         self._find(QtWidgets.QWidget, "holder_driven_picker").layout().addWidget(self._picker_driven)
 
+        self._combo_target = PopupComboBox()
+        self._combo_target.setObjectName("combo_pose_target")
+        self._combo_target.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
+        translate.bind(self._combo_target, "setPlaceholderText", "Driver and Driven History")
+        translate.bind(
+            self._combo_target, "setToolTip",
+            "Switch the driver and driven set of the Setup tab to one from the history",
+        )
+        self._find(QtWidgets.QWidget, "holder_pose_target").layout().addWidget(self._combo_target)
+
         self._strip = PoseStripWidget()
         self._strip.set_context_actions([("delete", tr("Delete Key"))])
+        self._strip.set_snap_to_marks(self._snap_to_keys.isChecked())
         self._find(QtWidgets.QWidget, "holder_pose_strip").layout().addWidget(self._strip)
 
         self._presets = PresetButtonRow()
@@ -255,6 +272,8 @@ class SetupPage(QtWidgets.QWidget):
 
         self._label_driver_node.installEventFilter(self)
         self._label_driven_node.installEventFilter(self)
+        for label in (self._label_driver_control_caption, self._label_driver_control):
+            label.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
 
     def _wrap_group(self, holder_name, body_name, title):
         holder = self._find(QtWidgets.QWidget, holder_name)
@@ -268,6 +287,12 @@ class SetupPage(QtWidgets.QWidget):
 
     def _connect_signals(self):
         self._btn_set_selected.clicked.connect(self._on_set_selected)
+        self._btn_set_control.clicked.connect(self._on_set_control)
+        for label in (self._label_driver_control_caption, self._label_driver_control):
+            label.customContextMenuRequested.connect(
+                functools.partial(self._on_control_menu, label),
+            )
+
         self._radio_driver_transform.toggled.connect(self._on_driver_mode_toggled)
         self._picker_driver.attrPicked.connect(self._choose_driver_attr)
         for attr, radio in self._driver_radios.items():
@@ -288,6 +313,9 @@ class SetupPage(QtWidgets.QWidget):
         self._picker_driven.attrPicked.connect(self._on_driven_attr_picked)
         self._list_custom.customContextMenuRequested.connect(self._on_custom_menu)
 
+        self._combo_target.popupAboutToShow.connect(self._on_target_popup)
+        self._combo_target.activated.connect(self._on_target_activated)
+        self._snap_to_keys.toggled.connect(self._strip.set_snap_to_marks)
         self._strip.scrubStarted.connect(self._on_scrub_started)
         self._strip.scrubbed.connect(self._on_scrubbed)
         self._strip.scrubFinished.connect(self._on_scrub_finished)
@@ -447,6 +475,33 @@ class SetupPage(QtWidgets.QWidget):
                 "{count} nodes are selected: using {name}", count=len(nodes), name=nodes[0].short_name,
             ))
 
+    def _on_control_menu(self, label, pos):
+        driver = self._state.driver
+        menu = QtWidgets.QMenu(self)
+        channel_box = menu.addAction(tr("Set from Channel Box"))
+        menu.addSeparator()
+        clear = menu.addAction(tr("Clear"))
+        has_attr = driver is not None and driver.attr is not None
+        channel_box.setEnabled(has_attr)
+        clear.setEnabled(has_attr and driver.control is not None)
+        chosen = menu.exec_(label.mapToGlobal(pos))
+        if chosen is channel_box:
+            self._on_set_control()
+        elif chosen is clear:
+            self._set_control(None)
+
+    def _on_set_control(self):
+        control = service.get_channel_box_control()
+        if control is None:
+            self._notify("⚠ " + tr("Select an attribute in the Channel Box"))
+            return
+
+        self._set_control(control)
+
+    def _set_control(self, control):
+        driver = self._state.driver.with_control(control)
+        self._set_state(self._state.with_driver(driver))
+
     def _on_driver_mode_toggled(self, checked):
         if self._rendering:
             return
@@ -528,6 +583,7 @@ class SetupPage(QtWidgets.QWidget):
             targets,
             self._remove_selected_nodes,
             self._refresh,
+            self._selected_uuids(),
         )
 
     def _on_cell_menu(self, attr, button, pos):
@@ -536,14 +592,18 @@ class SetupPage(QtWidgets.QWidget):
 
         self._exec_item_menu(button.mapToGlobal(pos), [(self._current_uuid, attr)])
 
-    def _exec_item_menu(self, global_pos, targets, on_remove=None, on_reload=None):
+    def _exec_item_menu(self, global_pos, targets, on_remove=None, on_reload=None, driven_uuids=()):
         menu = QtWidgets.QMenu(self)
         reload = None
         if on_reload is not None:
             reload = menu.addAction(tr("Reload"))
             menu.addSeparator()
 
-        curve_actions = self._add_curve_menu(menu, targets)
+        driver_actions = self._add_driver_menu(menu, driven_uuids) if driven_uuids else {}
+
+        listing = service.list_driven_curves(targets, self._snapshot.driver_plug)
+        curve_actions = self._add_curve_menu(menu, listing)
+        edit_actions = self._add_edit_curve_menu(menu, listing)
         remove = None
         if on_remove is not None:
             menu.addSeparator()
@@ -553,8 +613,12 @@ class SetupPage(QtWidgets.QWidget):
         chosen = menu.exec_(global_pos)
         if reload is not None and chosen is reload:
             on_reload()
+        elif chosen in driver_actions:
+            self._apply_driver(driver_actions[chosen])
         elif chosen in curve_actions:
             self._select_scene_node(curve_actions[chosen])
+        elif chosen in edit_actions:
+            gui_ops.show_in_graph_editor(edit_actions[chosen])
         elif remove is not None and chosen is remove:
             on_remove()
         elif chosen in current_actions:
@@ -562,8 +626,25 @@ class SetupPage(QtWidgets.QWidget):
         elif chosen in all_actions:
             self._delete_all_driven_keys(*all_actions[chosen])
 
-    def _add_curve_menu(self, menu, targets):
-        listing = service.list_driven_curves(targets, self._snapshot.driver_plug)
+    def _add_driver_menu(self, menu, driven_uuids):
+        submenu = menu.addMenu(tr("Set Driver from Driven Keys"))
+        actions = {}
+        for spec, label in service.list_drivers_of(driven_uuids):
+            actions[submenu.addAction(label)] = spec
+
+        submenu.setEnabled(bool(actions))
+        return actions
+
+    def _add_edit_curve_menu(self, menu, listing):
+        submenu = menu.addMenu(tr("Edit Anim Curve"))
+        submenu.setEnabled(bool(listing.curves))
+        actions = {}
+        for name in listing.curves:
+            actions[submenu.addAction(name)] = name
+
+        return actions
+
+    def _add_curve_menu(self, menu, listing):
         submenu = menu.addMenu(tr("Select Anim Curve"))
         submenu.setEnabled(bool(listing.curves))
         actions = {}
@@ -803,6 +884,7 @@ class SetupPage(QtWidgets.QWidget):
         self._cleared_key = None if entry is None else entry.key
         self._history = ()
         service.write_history(self._history)
+        self._render_target()
         self._notify(tr("History cleared"), warning=False)
 
     def restore_history(self, entry):
@@ -822,6 +904,39 @@ class SetupPage(QtWidgets.QWidget):
         if missing:
             names = ", ".join(name.rpartition("|")[2] for name in missing)
             self._notify("⚠ " + tr("Not found in the scene: {names}", names=names))
+
+    def _on_target_popup(self):
+        self.list_history()
+        self._render_target()
+
+    def _on_target_activated(self, index):
+        entry = self._target_entries[index]
+        if entry.key != self._current_driver_node():
+            self.restore_history(entry)
+
+    def _current_driver_node(self):
+        driver = self._state.driver
+        if driver is None:
+            return None
+
+        info = self._snapshot.nodes.get(driver.uuid)
+        if info is None:
+            return None
+
+        return info.name
+
+    def _render_target(self):
+        combo = self._combo_target
+        if self._history != self._target_entries:
+            self._target_entries = self._history
+            combo.clear()
+            for entry in self._history:
+                combo.addItem(entry.label)
+
+        keys = [entry.key for entry in self._target_entries]
+        driver_node = self._current_driver_node()
+        combo.setCurrentIndex(keys.index(driver_node) if driver_node in keys else -1)
+        combo.setEnabled(bool(keys))
 
     def _restore_latest_history(self):
         if not self._history:
@@ -862,9 +977,17 @@ class SetupPage(QtWidgets.QWidget):
 
     def _on_scrub_started(self):
         snapshot = self._snapshot
+        plug = snapshot.driver_plug
+        start = snapshot.driver_value
+        if snapshot.control_plug is not None:
+            plug = snapshot.control_plug
+            start = snapshot.control_value
+
         self._scrub = {
-            "plug": snapshot.driver_plug,
-            "start": snapshot.driver_value,
+            "plug": plug,
+            "start": start,
+            "offset": None if snapshot.driver_value is None else start - snapshot.driver_value,
+            "driver": snapshot.driver_plug,
             "held": self._read_held_pose(),
             "value": None,
             "error": None,
@@ -875,14 +998,17 @@ class SetupPage(QtWidgets.QWidget):
         if scrub is None or scrub["plug"] is None:
             return
 
+        target = value + scrub["offset"]
         try:
-            gui_ops.preview_driver_value(scrub["plug"], value, scrub["held"])
+            gui_ops.preview_driver_value(scrub["plug"], target, scrub["held"])
         except RuntimeError as exc:
             scrub["error"] = str(exc)
             return
 
-        scrub["value"] = value
-        text = _format(value, 3)
+        scrub["value"] = target
+        # コントロールを動かした場合、ドライバーがいくつになったかは読まないと分からない
+        driver_values = service.read_plug_values([scrub["driver"]])
+        text = _format(driver_values.get(scrub["driver"]), 3)
         self._label_pose_driver.setText(tr("Driver : {value}", value=text))
         self._label_driver_value.setText(text)
 
@@ -942,11 +1068,15 @@ class SetupPage(QtWidgets.QWidget):
         if snapshot.driver_plug is None:
             return
 
+        plug = snapshot.driver_plug
+        if snapshot.control_plug is not None:
+            plug = snapshot.control_plug
+
         error = None
         try:
-            gui_ops.apply_driver_preset(snapshot.driver_plug, value, self._read_held_pose())
+            gui_ops.apply_driver_preset(plug, value, self._read_held_pose())
         except RuntimeError as exc:
-            error = "⚠ " + tr("Cannot move {plug}: {exc}", plug=snapshot.driver_plug, exc=exc)
+            error = "⚠ " + tr("Cannot move {plug}: {exc}", plug=plug, exc=exc)
 
         self._refresh()
         if error is not None:
@@ -976,6 +1106,7 @@ class SetupPage(QtWidgets.QWidget):
     def _render(self):
         self._rendering = True
         try:
+            self._render_target()
             self._render_driver()
             self._render_driven()
             self._render_key()
@@ -995,6 +1126,19 @@ class SetupPage(QtWidgets.QWidget):
 
         return info.short_name
 
+    def _render_control(self):
+        driver = self._state.driver
+        plug = self._snapshot.control_plug
+        if plug is not None:
+            self._label_driver_control.setText(shorten_name(plug))
+            self._label_driver_control.setToolTip(plug)
+        elif driver is not None and driver.control is not None:
+            self._label_driver_control.setText(tr("(missing node)"))
+            self._label_driver_control.setToolTip("")
+        else:
+            self._label_driver_control.setText("-")
+            self._label_driver_control.setToolTip("")
+
     def _render_driver(self):
         snapshot = self._snapshot
         driver = self._state.driver
@@ -1010,6 +1154,7 @@ class SetupPage(QtWidgets.QWidget):
         )
         self._label_driver_attr.setText("-" if attr is None else attr)
         self._label_driver_value.setText(value)
+        self._render_control()
         if name is None:
             summary = tr("(not set)")
         elif attr is None:

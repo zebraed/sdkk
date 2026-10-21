@@ -22,20 +22,17 @@ class HistoryEntry:
     項目はドライバーのノードごとに1件。画面を元のとおりに戻せるよう、ドライバーのアトリビュートと
     ドリブンの有効なアトリビュートも持つが、画面で切り替えられるため、別々の項目にはしない
 
-    The nodes are kept by name, since a UUID does not survive opening
-    the scene again.
-
-    UUIDはシーンを開き直すと変わるため、ノードは名前で持つ
-
     Attributes:
         driver_node (str): ドライバーのノード名（ロングネーム）
         driver_attr (str): ドライバーのアトリビュート
         driven (tuple[tuple[str, tuple[str, ...]], ...]): （ドリブンのノード名, 有効なアトリビュート）
+        control (Optional[tuple[str, str]]): ドライバーの代わりに動かす（ノード名, アトリビュート）。なければNone
     """
 
     driver_node: str
     driver_attr: str
     driven: tuple
+    control: object = None
 
     def __post_init__(self):
         driven = []
@@ -43,6 +40,8 @@ class HistoryEntry:
             driven.append((node, tuple(attrs)))
 
         object.__setattr__(self, "driven", tuple(driven))
+        if self.control is not None:
+            object.__setattr__(self, "control", tuple(self.control))
 
     @property
     def key(self):
@@ -80,10 +79,15 @@ class HistoryEntry:
         Returns:
             dict: JSONにできる辞書
         """
-        return {
+        data = {
             "driver": {"node": self.driver_node, "attr": self.driver_attr},
             "driven": [{"node": node, "attrs": list(attrs)} for node, attrs in self.driven],
         }
+        if self.control is not None:
+            node, attr = self.control
+            data["control"] = {"node": node, "attr": attr}
+
+        return data
 
     @classmethod
     def from_dict(cls, data):
@@ -102,15 +106,23 @@ class HistoryEntry:
         """
         try:
             driver = data["driver"]
+            control = data.get("control")
+            if control is not None:
+                control = (control["node"], control["attr"])
+
             entry = cls(
                 driver["node"],
                 driver["attr"],
                 [(item["node"], item["attrs"]) for item in data["driven"]],
+                control,
             )
-        except (KeyError, TypeError) as exc:
+        except (KeyError, TypeError, AttributeError) as exc:
             raise ValueError(f"Invalid history entry: {data!r}") from exc
 
         names = [entry.driver_node, entry.driver_attr]
+        if entry.control is not None:
+            names.extend(entry.control)
+
         for node, attrs in entry.driven:
             names.append(node)
             names.extend(attrs)

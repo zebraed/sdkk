@@ -53,6 +53,28 @@ def get_transform_label(attr):
 
 
 @dataclass(frozen=True)
+class ControlSpec:
+    """The attribute moved on the screen in place of a driver that has an input connection.
+
+    入力接続があって直接動かせないドライバーの代わりに、画面の操作で動かすアトリビュート
+
+    The connection from the control to the driver can be anything,
+    so the control is moved by the amount of the operation, and the
+    keys are set at the driver value that results.
+
+    コントロールからドライバーへの接続は何でもよいため、コントロールは操作した量だけ動かし、
+    キーはその結果のドライバー値で打つ
+
+    Attributes:
+        uuid (str): ノードのUUID
+        attr (str): アトリビュートのロングネーム
+    """
+
+    uuid: str
+    attr: str
+
+
+@dataclass(frozen=True)
 class DriverSpec:
     """The driver of the setup: one node and one attribute.
 
@@ -61,10 +83,12 @@ class DriverSpec:
     Attributes:
         uuid (str): ノードのUUID。リネームしても追従するため名前は持たない
         attr (Optional[str]): アトリビュートのロングネーム。ノードだけで未選択ならNone
+        control (Optional[ControlSpec]): ドライバーの代わりに動かすアトリビュート。なければNone
     """
 
     uuid: str
     attr: object = None
+    control: object = None
 
     @property
     def is_transform(self):
@@ -78,10 +102,27 @@ class DriverSpec:
         Args:
             attr (Optional[str]): 新しいアトリビュート
 
+        The control is cleared, since it belongs to the old attribute.
+
+        コントロールは前のアトリビュートのものなので外す
+
         Returns:
             DriverSpec: 更新した結果
         """
-        return replace(self, attr=attr)
+        return replace(self, attr=attr, control=None)
+
+    def with_control(self, control):
+        """Return a driver with the control replaced.
+
+        コントロールを置き換えたドライバーを返す
+
+        Args:
+            control (Optional[ControlSpec]): 新しいコントロール。Noneで解除
+
+        Returns:
+            DriverSpec: 更新した結果
+        """
+        return replace(self, control=control)
 
 
 @dataclass(frozen=True)

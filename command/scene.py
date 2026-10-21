@@ -350,3 +350,32 @@ def list_driven_plugs(driver):
             plugs.append(key.driven)
 
     return plugs
+
+
+def list_channel_box_plugs():
+    """List the attributes selected in the main channel box.
+
+    メインのチャンネルボックスで選択しているアトリビュートを列挙する
+
+    Returns:
+        list[str]: "ノードのロングネーム.アトリビュートのロングネーム"。チャンネルボックスがない
+            （GUIなしのMayaなど）、または選択がなければ空
+    """
+    if not cmds.channelBox("mainChannelBox", ex=True):
+        return []
+
+    attrs = cmds.channelBox("mainChannelBox", q=True, sma=True)
+    nodes = cmds.channelBox("mainChannelBox", q=True, mol=True)
+    if attrs is None or nodes is None:
+        return []
+
+    plugs = []
+    for node in cmds.ls(nodes, l=True):
+        for attr in attrs:
+            if not cmds.attributeQuery(attr, n=node, ex=True):
+                continue
+
+            long_name = cmds.attributeQuery(attr, n=node, ln=True)
+            plugs.append(f"{node}.{long_name}")
+
+    return plugs

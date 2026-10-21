@@ -26,6 +26,7 @@ from .confirm_dialog import ConfirmListDialog
 from .manage_dialog import ManageDialog
 from .manage_page import ManagePage
 from .mirror_page import MirrorPage
+from .preferences_dialog import PreferencesDialog
 from .setup_page import SetupPage
 from .widgets.common import ElidedLabel
 from .window_icon import make_window_icon
@@ -75,8 +76,9 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         self._options = {
             "select_on_click": self.findChild(QtWidgets.QAction, "act_select_on_click"),
             "unlock_locked": self.findChild(QtWidgets.QAction, "act_unlock_locked"),
+            "snap_to_keys": self.findChild(QtWidgets.QAction, "act_snap_to_keys"),
         }
-        self._page = SetupPage(self._options["select_on_click"])
+        self._page = SetupPage(self._options["select_on_click"], self._options["snap_to_keys"])
         self.findChild(QtWidgets.QWidget, "tab_setup").layout().addWidget(self._page)
         self._page.statusChanged.connect(self._on_status_changed)
         self._manage = ManagePage(self._options["select_on_click"], self._options["unlock_locked"])
@@ -97,11 +99,18 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         export_action.triggered.connect(functools.partial(self._show_manage_dialog, "export"))
         import_action = self.findChild(QtWidgets.QAction, "act_import_driven_keys")
         import_action.triggered.connect(functools.partial(self._show_manage_dialog, "import"))
-        delete_action = self.findChild(QtWidgets.QAction, "act_delete_driven_keys")
-        delete_action.triggered.connect(self._on_delete_driven_keys)
+        delete_selected_action = self.findChild(QtWidgets.QAction, "act_delete_selected_driven_keys")
+        delete_selected_action.triggered.connect(self._on_delete_selected_driven_keys)
+        delete_all_action = self.findChild(QtWidgets.QAction, "act_delete_all_driven_keys")
+        delete_all_action.triggered.connect(self._on_delete_all_driven_keys)
         about_action = self.findChild(QtWidgets.QAction, "act_about")
         about_action.triggered.connect(self._on_about)
+        self._preferences = None
+        preferences_action = self.findChild(QtWidgets.QAction, "act_preferences")
+        preferences_action.triggered.connect(self._show_preferences)
+        self._language_actions = {}
         self._build_language_menu()
+        translate.notifier.languageChanged.connect(self._on_language_changed)
         pose_area = self._page.detach_pose_area()
         pose_area.layout().setContentsMargins(6, 0, 6, 6)
         self.findChild(QtWidgets.QVBoxLayout, "verticalLayout_main").addWidget(pose_area)
@@ -119,6 +128,9 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             dialog.close()
 
         self._manage_dialogs.clear()
+        if self._preferences is not None:
+            self._preferences.close()
+
         self._page.shutdown()
         self._manage.shutdown()
         self._mirror.shutdown()
@@ -168,9 +180,27 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             action.setChecked(code == i18n.get_language())
             action.triggered.connect(functools.partial(self._on_language_picked, code))
             group.addAction(action)
+            self._language_actions[code] = action
 
     def _on_language_picked(self, code, _checked=False):
         translate.set_language(code)
+
+    def _on_language_changed(self):
+        action = self._language_actions.get(i18n.get_language())
+        if action is not None:
+            action.setChecked(True)
+
+    def _show_preferences(self, _checked=False):
+        if self._preferences is None:
+            self._preferences = PreferencesDialog(self._options, self)
+            self._preferences.finished.connect(self._on_preferences_closed)
+
+        self._preferences.show()
+        self._preferences.raise_()
+        self._preferences.activateWindow()
+
+    def _on_preferences_closed(self, _result):
+        self._preferences = None
 
     def _build_history_menu(self):
         self._menu_history.clear()
@@ -193,7 +223,34 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
     def _on_history_cleared(self, _checked=False):
         self._page.clear_history()
 
-    def _on_delete_driven_keys(self, _checked=False):
+    def _on_delete_all_driven_keys(self, _checked=False):
+        count = len(service.list_linked_keys())
+        if not count:
+            self._show_message(tr("No driven keys in the scene"))
+            return
+
+        answer = QtWidgets.QMessageBox.warning(
+            self,
+            tr("Delete All Driven Keys"),
+            tr("Delete all {count} driven key(s) in the scene?", count=count)
+            + "\n\n"
+            + tr("This removes every driven key in the scene, not only the ones linked to the selected nodes."),
+            QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.Cancel,
+            QtWidgets.QMessageBox.Cancel,
+        )
+        if answer != QtWidgets.QMessageBox.Yes:
+            return
+
+        try:
+            names = ops.delete_all_driven_keys()
+        except (RuntimeError, ValueError) as exc:
+            self._show_warning("⚠ " + tr("Cannot delete the driven keys: {exc}", exc=exc))
+            return
+
+        print_commands(format_call("delete_all_driven_keys", {}))
+        self._show_message(tr("Deleted {count} driven key(s)", count=len(names)))
+
+    def _on_delete_selected_driven_keys(self, _checked=False):
         names = [info.name for info in service.get_selected_nodes()]
         if not names:
             self._show_warning("⚠ " + tr("Select the driver or driven nodes first"))
@@ -343,14 +400,14 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         return path
 
     def _show_message(self, text):
-        self._status_bar.showMessage(text, 10000)
+        self._status_bar.showMessage(service.shorten_text(text), 10000)
 
     def _show_warning(self, text):
         self._status_bar.clearMessage()
         self._on_status_changed(text, True)
 
     def _on_status_changed(self, text, warning):
-        self._label_context.setText(text)
+        self._label_context.setText(service.shorten_text(text))
         self._label_context.setProperty("state", "warning" if warning else "normal")
         self._label_context.style().unpolish(self._label_context)
         self._label_context.style().polish(self._label_context)

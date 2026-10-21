@@ -25,12 +25,13 @@ class PoseStripWidget(QtWidgets.QWidget):
 
     Dragging with the left button works as a slider for the driver: the
     value under the mouse is sent while dragging. It snaps to a mark
-    near the mouse, and to steps of 0.1 while Shift is held. It needs at
+    near the mouse unless set_snap_to_marks turns it off, and to steps
+    of 0.1 while Shift is held. It needs at
     least one mark to know the scale; with a single mark, the strip spans
     the mark value plus and minus max(abs(value), 1.0).
 
     左ボタンのドラッグは、ドライバーの値のスライダーとして働き、ドラッグ中はマウス位置の値を送る
-    マウスの近くのマーカーには吸い付き、Shiftを押している間は0.1刻みにする
+    マウスの近くのマーカーには吸い付き（set_snap_to_marksで切れる）、Shiftを押している間は0.1刻みにする
     目盛りを決めるため、マーカーが1つ以上必要。1つだけのときは、マーカーの値の前後
     max(abs(値), 1.0)をストリップの範囲とする
 
@@ -86,6 +87,7 @@ class PoseStripWidget(QtWidgets.QWidget):
         self._actions = []
         self._drag = None
         self._scrubbing = False
+        self._snap_to_marks = True
         self.setMouseTracking(True)
         self.setMinimumHeight(78)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -119,6 +121,16 @@ class PoseStripWidget(QtWidgets.QWidget):
             actions (Sequence[tuple[str, str]]): （項目のid, 表示名）。contextTriggeredで返るのはid
         """
         self._actions = list(actions)
+
+    def set_snap_to_marks(self, enabled):
+        """Set whether the slider snaps to a mark near the mouse.
+
+        スライダーを、マウスの近くのマーカーに吸い付かせるかを設定する
+
+        Args:
+            enabled (bool): 吸い付かせるか
+        """
+        self._snap_to_marks = enabled
 
     def sizeHint(self):
         return QtCore.QSize(300, 78)
@@ -223,9 +235,10 @@ class PoseStripWidget(QtWidgets.QWidget):
         if event.modifiers() & QtCore.Qt.ShiftModifier:
             return round(round(raw / self._DRAG_STEP) * self._DRAG_STEP, 3)
 
-        for mark, mark_x in zip(self._marks, xs):
-            if abs(x - mark_x) <= self._SNAP_PX:
-                return mark.value
+        if self._snap_to_marks:
+            for mark, mark_x in zip(self._marks, xs):
+                if abs(x - mark_x) <= self._SNAP_PX:
+                    return mark.value
 
         return round(raw, 3)
 

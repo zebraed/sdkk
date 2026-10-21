@@ -149,6 +149,29 @@ class MirrorPage(QtWidgets.QWidget):
             self._checks_driven[attr] = find(QtWidgets.QCheckBox, f"check_driven_{attr}")
             self._checks_driver[attr] = find(QtWidgets.QCheckBox, f"check_driver_{attr}")
 
+    def _align_invert_rows(self):
+        driven_row = self._find(QtWidgets.QLayout, "horizontalLayout_invert_driven")
+        driver_row = self._find(QtWidgets.QLayout, "horizontalLayout_invert_driver")
+        parent = self._find(QtWidgets.QWidget, "widget_rule_body").layout()
+        position = parent.indexOf(driven_row)
+
+        grid = QtWidgets.QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(6)
+        grid.setVerticalSpacing(parent.spacing())
+        for row, (label_name, checks) in enumerate((
+            ("label_invert_driven", self._checks_driven),
+            ("label_invert_driver", self._checks_driver),
+        )):
+            grid.addWidget(self._find(QtWidgets.QLabel, label_name), row, 0)
+            for column, attr in enumerate(TRANSFORM_ATTRS, start=1):
+                grid.addWidget(checks[attr], row, column)
+
+        grid.setColumnStretch(len(TRANSFORM_ATTRS) + 1, 1)
+        parent.removeItem(driver_row)
+        parent.removeItem(driven_row)
+        parent.insertLayout(position, grid)
+
     def _setup_widgets(self):
         for holder_name, body_name, title in (
             ("holder_rule", "widget_rule_body", "RULE"),
@@ -166,6 +189,7 @@ class MirrorPage(QtWidgets.QWidget):
         self._combo_policy.addItem("", ConflictPolicy.SKIP)
         translate.bind(self._combo_policy, "setItemText", "Replace", 0)
         translate.bind(self._combo_policy, "setItemText", "Skip", 1)
+        self._align_invert_rows()
         for attr, check in self._checks_driven.items():
             check.setChecked(attr in DEFAULT_DRIVEN_INVERT)
 

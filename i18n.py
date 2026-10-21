@@ -2,11 +2,6 @@
 UI language catalog: looks up a translation by the English source text.
 
 UIの言語カタログ。英語の原文をキーに翻訳を引く
-
-English is the source language, so it has no catalog file. A text that
-is missing from the catalog is shown in English.
-
-英語は原文そのものなのでカタログを持たない。カタログにない文字列は英語のまま表示する
 """
 import json
 import os

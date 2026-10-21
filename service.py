@@ -4,6 +4,7 @@ Read-only queries for the GUI. Never changes the scene.
 GUI向けの読み取り専用のクエリ
 """
 import json
+import re
 from dataclasses import dataclass, replace
 from typing import Optional
 
@@ -14,12 +15,14 @@ from .core.history import HistoryEntry, parse_history
 from .i18n import tr
 from .core.model import Plug
 from .core.pose_keys import PoseSummary, summarize_pose_keys
-from .core.setup_state import TRANSFORM_ATTRS, DriverSpec, SetupState
+from .core.setup_state import TRANSFORM_ATTRS, ControlSpec, DriverSpec, SetupState
 from .core.state import Role, Status
 
 SETTINGS_KEY = "sdkk_window_settings"
 HISTORY_KEY = "sdkk_history"
 POSE_TOLERANCE = 1e-4
+
+_DAG_PATH = re.compile(r"(?:\|[A-Za-z0-9_:]+)+")
 
 
 @dataclass(frozen=True)
@@ -113,6 +116,8 @@ class SetupSnapshot:
             "driver"は現在のドライバーのキー、"other"は別のドライバーのキー。動いていなければ含まない
         driver_attrs (tuple[str, ...]): ドライバーのノードで、すでにドリブンキーを動かしているアトリビュート
         pose_modified (bool): key_plugsのドリブンの現在値が、現在のドライバー値でのカーブの値と違うか
+        control_plug (Optional[str]): ドライバーの代わりに動かすアトリビュート。未設定または見つからなければNone
+        control_value (Optional[float]): コントロールの現在値
     """
 
     nodes: dict
@@ -126,6 +131,8 @@ class SetupSnapshot:
     driven_state: dict
     driver_attrs: tuple
     pose_modified: bool = False
+    control_plug: Optional[str] = None
+    control_value: Optional[float] = None
 
 
 @dataclass(frozen=True)
@@ -166,6 +173,7 @@ class SetupConnectionIndex:
     inputs: dict
     driven_state: dict
     driver_attrs: tuple
+    control_plug: Optional[str] = None
 
 
 class SetupSceneReader:
@@ -223,6 +231,13 @@ class SetupSceneReader:
         if driver_value is None:
             driver_plug = None
 
+        control_plug = None
+        control_value = None
+        if driver_plug is not None and index.control_plug is not None:
+            control_value = scene.read_value(index.control_plug)
+            if control_value is not None:
+                control_plug = index.control_plug
+
         return SetupSnapshot(
             nodes=index.nodes,
             driver_plug=driver_plug,
@@ -239,6 +254,8 @@ class SetupSceneReader:
             driven_state=index.driven_state,
             driver_attrs=index.driver_attrs,
             pose_modified=_is_pose_modified(index, values, driver_value),
+            control_plug=control_plug,
+            control_value=control_value,
         )
 
     def refresh_keys(self):
@@ -361,6 +378,14 @@ def _build_setup_index(state, detail_uuid, target_uuids):
         if cmds.objExists(plug):
             driver_plug = plug
 
+    control_plug = None
+    if driver_plug is not None and state.driver.control is not None:
+        control_name = scene.find_node(state.driver.control.uuid)
+        if control_name is not None:
+            plug = f"{control_name}.{state.driver.control.attr}"
+            if cmds.objExists(plug):
+                control_plug = plug
+
     current_curves = set()
     if driver_plug is not None:
         for key in driver_keys:
@@ -448,6 +473,7 @@ def _build_setup_index(state, detail_uuid, target_uuids):
         inputs=inputs,
         driven_state=driven_state,
         driver_attrs=tuple(driver_attrs),
+        control_plug=control_plug,
     )
 
 
@@ -539,6 +565,22 @@ def list_driver_attrs(uuid):
     return transform + sorted(attrs - set(TRANSFORM_ATTRS))
 
 
+def get_channel_box_control():
+    """Return the first attribute selected in the channel box, as a control.
+
+    チャンネルボックスで選択している最初のアトリビュートを、コントロールとして返す
+
+    Returns:
+        Optional[ControlSpec]: コントロール。チャンネルボックスで何も選択していなければNone
+    """
+    plugs = scene.list_channel_box_plugs()
+    if not plugs:
+        return None
+
+    plug = Plug.parse(plugs[0])
+    return ControlSpec(cmds.ls(plug.node, uid=True)[0], plug.attr)
+
+
 def list_driven_of(driver):
     """List the driven attributes that the driver already drives, per node UUID.
 
@@ -564,6 +606,31 @@ def list_driven_of(driver):
         pairs.append((cmds.ls(plug.node, uid=True)[0], plug.attr))
 
     return pairs
+
+
+def list_drivers_of(uuids):
+    """List the driver attributes that already drive the nodes, as the driver specs and their labels.
+
+    ノードをすでに動かしているドライバーアトリビュートを、ドライバーとその表示名で列挙する
+
+    Args:
+        uuids (Iterable[str]): ドリブン側のノードのUUID
+
+    Returns:
+        list[tuple[DriverSpec, str]]: （ドライバー, "ノード.アトリビュート"の表示）。重複せず、見つけた順
+    """
+    names = list_node_names(uuids)
+    drivers = []
+    for key in drivenkey.list_driven_keys(names, Role.DRIVEN):
+        if key.driver is None:
+            continue
+
+        plug = Plug.parse(key.driver)
+        spec = DriverSpec(cmds.ls(plug.node, uid=True)[0], plug.attr)
+        if spec not in [found for found, _ in drivers]:
+            drivers.append((spec, shorten_names([key.driver])[0]))
+
+    return drivers
 
 
 def list_driven_curves(targets, driver_plug=None):
@@ -799,29 +866,57 @@ def shorten_names(names):
     shortened = []
     for name in names:
         node, dot, attr = name.partition(".")
-        short = node.rpartition("|")[2]
-        if short != node and len(cmds.ls(short)) == 1:
-            node = short
-
-        shortened.append(f"{node}{dot}{attr}")
+        shortened.append(f"{_shorten_node(node)}{dot}{attr}")
 
     return shortened
 
 
-def list_linked_keys(node_names):
+def shorten_text(text):
+    """Shorten the DAG paths inside a message, when the short name is unique.
+
+    メッセージ中のDAGパスを、短い名前が一意なら短くする
+
+    Args:
+        text (str): ロングネームを含みうるメッセージ
+
+    Returns:
+        str: ロングネームを短くしたメッセージ
+    """
+    return _DAG_PATH.sub(lambda match: _shorten_node(match.group(0)), text)
+
+
+def _shorten_node(node):
+    short = node.rpartition("|")[2]
+    if short == node:
+        return node
+
+    try:
+        found = cmds.ls(short)
+    except RuntimeError:
+        return node
+
+    return short if len(found) == 1 else node
+
+    return node
+
+
+def list_linked_keys(node_names=None):
     """List the driven keys linked to the nodes, as driver or as driven.
 
     ノードにつながっているドリブンキーを、ドライバー側としてもドリブン側としても列挙する
 
     Args:
-        node_names (Iterable[str]): ノード名
+        node_names (Optional[Iterable[str]]): ノード名。Noneはシーンのすべて
 
     Returns:
         list[tuple[str, str]]: （animCurveノード名, "ドライバー → ドリブン"の表示）。重複しない
             読み取れないドリブンキーも含む
     """
     linked = []
-    for key in drivenkey.list_driven_keys(list(node_names), Role.BOTH):
+    if node_names is not None:
+        node_names = list(node_names)
+
+    for key in drivenkey.list_driven_keys(node_names, Role.BOTH):
         labels = []
         for plug in (key.driver, key.driven):
             if plug is None:
@@ -979,7 +1074,13 @@ def build_history_entry(state):
     if not driven:
         return None
 
-    return HistoryEntry(driver_name, driver.attr, driven)
+    control = None
+    if driver.control is not None:
+        control_name = scene.find_node(driver.control.uuid)
+        if control_name is not None:
+            control = (control_name, driver.control.attr)
+
+    return HistoryEntry(driver_name, driver.attr, driven, control)
 
 
 def refresh_history(entries):
@@ -1026,7 +1127,7 @@ def restore_state(entry):
     if uuid is None:
         missing.append(entry.driver_node)
     else:
-        driver = DriverSpec(uuid, entry.driver_attr)
+        driver = DriverSpec(uuid, entry.driver_attr, _restore_control(entry.control))
 
     state = SetupState().with_driver(driver)
     for name, attrs in entry.driven:
@@ -1052,6 +1153,18 @@ def _read_option(key):
         return None
 
 
+def _restore_control(control):
+    if control is None:
+        return None
+
+    node, attr = control
+    uuid = scene.find_uuid(node)
+    if uuid is None:
+        return None
+
+    return ControlSpec(uuid, attr)
+
+
 def _refresh_history_entry(entry):
     uuid = scene.find_uuid(entry.driver_node)
     if uuid is None:
@@ -1071,6 +1184,8 @@ def _refresh_history_entry(entry):
     if not driven:
         return None
 
+    # コントロールは元のドライバーのアトリビュートのものなので、アトリビュートが変わったら外す
+    control = entry.control if attr == entry.driver_attr else None
     return HistoryEntry(
-        entry.driver_node, attr, [(name, tuple(each)) for name, each in driven.items()],
+        entry.driver_node, attr, [(name, tuple(each)) for name, each in driven.items()], control,
     )

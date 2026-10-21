@@ -4,6 +4,7 @@ ManageタブのExportまたはImportを再利用する非モーダルダイア�
 """
 from ..vendor.Qt import QtCore, QtWidgets
 
+from .. import service
 from . import translate
 from .manage_page import ManagePage
 
@@ -54,7 +55,7 @@ class ManageDialog(QtWidgets.QDialog):
         super().closeEvent(event)
 
     def _show_message(self, text, warning):
-        self._message.setText(text)
+        self._message.setText(service.shorten_text(text))
         self._message.setProperty("state", "warning" if warning else "normal")
         self._message.style().unpolish(self._message)
         self._message.style().polish(self._message)
