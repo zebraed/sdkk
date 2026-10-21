@@ -83,6 +83,35 @@ class ExportTarget:
 
 
 @dataclass(frozen=True)
+class DrivenKeyRow:
+    """One driven key in the scene, with what the viewer needs to select it or to set it on the Setup tab.
+
+    シーンにある1つのドリブンキーと、ビューアで選択したり、Setupタブへ設定したりするのに必要な情報
+
+    Attributes:
+        curve (str): animCurveノード名
+        driver (Optional[DriverSpec]): ドライバー。未接続ならNone
+        driver_node (Optional[str]): ドライバーのノードのロングネーム
+        driver_label (str): ドライバーの表示（"ノード.アトリビュート"。未接続は"-"）
+        driven (Optional[tuple[str, str]]): （ドリブンのノードのUUID, アトリビュート）。経路を解決できなければNone
+        driven_node (Optional[str]): ドリブンのノードのロングネーム
+        driven_label (str): ドリブンの表示
+        keys (int): キーの数
+        status (Status): ドリブンキーの状態
+    """
+
+    curve: str
+    driver: Optional[DriverSpec]
+    driver_node: Optional[str]
+    driver_label: str
+    driven: Optional[tuple]
+    driven_node: Optional[str]
+    driven_label: str
+    keys: int
+    status: Status
+
+
+@dataclass(frozen=True)
 class CurveListing:
     """The nodes that drive some attributes.
 
@@ -927,6 +956,42 @@ def list_linked_keys(node_names=None):
         linked.append((key.curve, f"{labels[0]} → {labels[1]}"))
 
     return linked
+
+
+def list_scene_driven_keys():
+    """List every driven key in the scene as rows for the viewer.
+
+    シーンのすべてのドリブンキーを、ビューア向けの行として列挙する
+
+    Returns:
+        list[DrivenKeyRow]: シーンの順。読み取れないドリブンキーも含む
+    """
+    rows = []
+    for key in drivenkey.list_driven_keys(None, Role.BOTH):
+        driver, driver_node = _split_plug(key.driver)
+        driven, driven_node = _split_plug(key.driven)
+        rows.append(DrivenKeyRow(
+            key.curve,
+            None if driver is None else DriverSpec(*driver),
+            driver_node,
+            "-" if key.driver is None else shorten_names([key.driver])[0],
+            driven,
+            driven_node,
+            "-" if key.driven is None else shorten_names([key.driven])[0],
+            cmds.keyframe(key.curve, q=True, kc=True) or 0,
+            key.status,
+        ))
+
+    return rows
+
+
+def _split_plug(text):
+    if text is None:
+        return None, None
+
+    plug = Plug.parse(text)
+    node = cmds.ls(plug.node, l=True)[0]
+    return (cmds.ls(node, uid=True)[0], plug.attr), node
 
 
 def list_node_names(uuids):

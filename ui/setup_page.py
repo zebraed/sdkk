@@ -418,7 +418,7 @@ class SetupPage(QtWidgets.QWidget):
 
         self._refresh(structure=structure, keys=keys)
 
-    def _apply_driver(self, driver):
+    def apply_driver(self, driver):
         """Set the driver. The driven list follows the driver attribute.
 
         ドライバーを設定する。ドリブンの一覧は、ドライバーのアトリビュートに従う
@@ -458,6 +458,27 @@ class SetupPage(QtWidgets.QWidget):
         self._driver_custom_view = driver.attr is not None and not driver.is_transform
         self._set_state(state)
 
+    def add_driven_attrs(self, pairs):
+        """Add driven nodes with the attributes enabled.
+
+        ドリブンのノードを、アトリビュートを有効にして追加する
+
+        Args:
+            pairs (Iterable[tuple[str, str]]): （ノードのUUID, アトリビュート）。先頭のノードを注目するノードにする
+        """
+        state = self._state
+        first = None
+        for uuid, attr in pairs:
+            if first is None:
+                first = uuid
+
+            state = state.add_nodes([uuid]).with_driven_attr(uuid, attr, True)
+
+        if first is not None:
+            self._current_uuid = first
+
+        self._set_state(state)
+
     def _notify(self, text, warning=True):
         self.statusChanged.emit(text, warning)
 
@@ -475,7 +496,7 @@ class SetupPage(QtWidgets.QWidget):
         if driver_attrs and attr not in driver_attrs:
             attr = driver_attrs[0]
 
-        self._apply_driver(DriverSpec(nodes[0].uuid, attr))
+        self.apply_driver(DriverSpec(nodes[0].uuid, attr))
         if len(nodes) > 1:
             self._notify("⚠ " + tr(
                 "{count} nodes are selected: using {name}", count=len(nodes), name=nodes[0].short_name,
@@ -528,7 +549,7 @@ class SetupPage(QtWidgets.QWidget):
             self._render()
             return
 
-        self._apply_driver(driver.with_attr(attr))
+        self.apply_driver(driver.with_attr(attr))
 
     def _list_driver_candidates(self):
         driver = self._state.driver
@@ -620,7 +641,7 @@ class SetupPage(QtWidgets.QWidget):
         if reload is not None and chosen is reload:
             on_reload()
         elif chosen in driver_actions:
-            self._apply_driver(driver_actions[chosen])
+            self.apply_driver(driver_actions[chosen])
         elif chosen in curve_actions:
             self._select_scene_node(curve_actions[chosen])
         elif chosen in edit_actions:

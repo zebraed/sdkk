@@ -1,13 +1,13 @@
 """
 The table models of the screens: driven nodes, export targets, import items,
-animation to convert, and mirror rows.
+animation to convert, mirror rows, and the driven keys of the scene.
 """
 from dataclasses import dataclass
 
 from ...vendor.Qt import QtCore
 
 from ...core.setup_state import TRANSFORM_ATTRS, get_transform_label
-from ...core.state import MirrorStatus
+from ...core.state import MirrorStatus, Status
 from ...i18n import tr
 from ..node_icons import get_node_icon
 from .base import CheckableRowModel, RowTableModel
@@ -404,6 +404,61 @@ class MirrorRowModel(CheckableRowModel):
 
         lines.extend(row.item.differences)
         return "\n".join(lines)
+
+
+_STATUS_TEXTS = {
+    Status.OK: "OK",
+    Status.NO_DRIVER: "No driver",
+    Status.NO_DRIVEN: "No driven",
+    Status.FAN_OUT: "Multiple outputs",
+    Status.UNSUPPORTED: "Unsupported",
+}
+
+
+class DrivenKeyRowModel(RowTableModel):
+    """Shows the driven keys of the scene: Driver, Driven, Keys and Status.
+
+    シーンのドリブンキーを表示する（Driver・Driven・Keys・Status）
+    """
+
+    COLUMNS = ("Driver", "Driven", "Keys", "Status")
+    RIGHT_ALIGNED = frozenset({2})
+
+    def set_rows(self, rows):
+        """Replace the rows.
+
+        行を置き換える
+
+        Args:
+            rows (Sequence[DrivenKeyRow]): 表示するドリブンキー
+        """
+        self.beginResetModel()
+        self._rows = list(rows)
+        self.endResetModel()
+
+    def format_cell(self, row, column):
+        if column == 0:
+            return row.driver_label
+
+        if column == 1:
+            return row.driven_label
+
+        if column == 2:
+            return str(row.keys)
+
+        return tr(_STATUS_TEXTS[row.status])
+
+    def format_tip(self, row, column):
+        if column == 0:
+            return row.driver_node
+
+        if column == 1:
+            return row.driven_node
+
+        if column == 3:
+            return row.curve
+
+        return None
 
 
 def _format_short_plug(plug):

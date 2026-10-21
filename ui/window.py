@@ -23,6 +23,7 @@ from . import translate
 from .advanced_page import AdvancedPage
 from .command_print import format_call, print_commands, shorten_names
 from .confirm_dialog import ConfirmListDialog
+from .driven_key_viewer import DrivenKeyViewer
 from .manage_dialog import ManageDialog
 from .manage_page import ManagePage
 from .mirror_page import MirrorPage
@@ -105,6 +106,10 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         delete_all_action.triggered.connect(self._on_delete_all_driven_keys)
         about_action = self.findChild(QtWidgets.QAction, "act_about")
         about_action.triggered.connect(self._on_about)
+        self._viewer = None
+        self._viewer_size = None
+        viewer_action = self.findChild(QtWidgets.QAction, "act_driven_key_viewer")
+        viewer_action.triggered.connect(self._show_driven_key_viewer)
         self._preferences = None
         preferences_action = self.findChild(QtWidgets.QAction, "act_preferences")
         preferences_action.triggered.connect(self._show_preferences)
@@ -128,8 +133,9 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
             dialog.close()
 
         self._manage_dialogs.clear()
-        if self._preferences is not None:
-            self._preferences.close()
+        for dialog in (self._viewer, self._preferences):
+            if dialog is not None:
+                dialog.close()
 
         self._page.shutdown()
         self._manage.shutdown()
@@ -147,6 +153,12 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         for key, action in self._options.items():
             settings[key] = action.isChecked()
 
+        if self._viewer is not None:
+            self._viewer_size = self._viewer.size()
+
+        if self._viewer_size is not None:
+            settings["viewer_size"] = [self._viewer_size.width(), self._viewer_size.height()]
+
         settings.update(self._page.gather_settings())
         settings.update(self._mirror.gather_settings())
         settings.update(self._advanced.gather_settings())
@@ -160,6 +172,14 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         directory = settings.get("file_dialog_dir")
         if isinstance(directory, str):
             self._file_dir = directory
+
+        size = settings.get("viewer_size")
+        if (
+            isinstance(size, list)
+            and len(size) == 2
+            and all(isinstance(each, int) and not isinstance(each, bool) and each > 0 for each in size)
+        ):
+            self._viewer_size = QtCore.QSize(*size)
 
         for key, action in self._options.items():
             checked = settings.get(key)
@@ -189,6 +209,34 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         action = self._language_actions.get(i18n.get_language())
         if action is not None:
             action.setChecked(True)
+
+    def _show_driven_key_viewer(self, _checked=False):
+        if self._viewer is None:
+            self._viewer = DrivenKeyViewer(self._options["select_on_click"], self)
+            self._viewer.messageChanged.connect(self._on_manage_message)
+            self._viewer.driverRequested.connect(self._on_viewer_driver)
+            self._viewer.drivenRequested.connect(self._on_viewer_driven)
+            self._viewer.finished.connect(self._on_viewer_closed)
+            if self._viewer_size is not None:
+                self._viewer.resize(self._viewer_size)
+
+        self._viewer.present()
+
+    def _on_viewer_driver(self, driver):
+        self._show_setup_tab()
+        self._page.apply_driver(driver)
+
+    def _on_viewer_driven(self, pairs):
+        self._show_setup_tab()
+        self._page.add_driven_attrs(pairs)
+
+    def _on_viewer_closed(self, _result):
+        self._viewer_size = self._viewer.size()
+        self._viewer = None
+
+    def _show_setup_tab(self):
+        tabs = self.findChild(QtWidgets.QTabWidget, "widget_tab")
+        tabs.setCurrentWidget(self.findChild(QtWidgets.QWidget, "tab_setup"))
 
     def _show_preferences(self, _checked=False):
         if self._preferences is None:

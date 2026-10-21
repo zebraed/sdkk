@@ -155,6 +155,8 @@
     <addaction name="act_export_driven_keys"/>
     <addaction name="act_import_driven_keys"/>
     <addaction name="separator"/>
+    <addaction name="act_driven_key_viewer"/>
+    <addaction name="separator"/>
     <addaction name="menu_delete"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
@@ -237,6 +239,14 @@
   <action name="act_import_driven_keys">
    <property name="text">
     <string>Import Driven Key...</string>
+   </property>
+  </action>
+  <action name="act_driven_key_viewer">
+   <property name="text">
+    <string>Driven Key Viewer...</string>
+   </property>
+   <property name="toolTip">
+    <string>List the driven keys of the scene, and set them on the Setup tab</string>
    </property>
   </action>
   <action name="act_about">
