@@ -16,7 +16,7 @@ def preview_driver_value(driver, value, held=None):
     スライダーのドラッグ中など、Undoに積まずにドライバーを指定の値へ動かす
 
     Args:
-        driver (str): 動かすアトリビュート。ドライバー、またはその代わりに動かすコントロール
+        driver (str): 動かすアトリビュート。ドライバー、その代わりに動かすコントロール、またはドリブン
         value (float): 設定する値
         held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
             ドリブンキーに従って動いてしまうドリブンのポーズを保つために使う
@@ -35,7 +35,7 @@ def commit_driver_value(driver, start_value, value, held=None):
     preview_driver_valueで動かしたドライバーについて、1回分のUndoを残す
 
     Args:
-        driver (str): 動かすアトリビュート。ドライバー、またはその代わりに動かすコントロール
+        driver (str): 動かすアトリビュート。ドライバー、その代わりに動かすコントロール、またはドリブン
         start_value (float): 動かし始める前の値
         value (float): 最終的な値
         held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
@@ -60,7 +60,7 @@ def apply_driver_preset(driver, value, held=None):
     現在の値は、描画済みの値ではなく、この関数を呼んだ時点で読み直す。連続してクリックしても積み上がる
 
     Args:
-        driver (str): 動かすアトリビュート。ドライバー、またはその代わりに動かすコントロール
+        driver (str): 動かすアトリビュート。ドライバー、その代わりに動かすコントロール、またはドリブン
         value (float): プリセットの値。0以外は、現在の値に加える量（負なら減らす）
         held (Optional[Mapping[str, float]]): ドライバーを動かした後に、値を元へ戻すドリブンアトリビュート
 

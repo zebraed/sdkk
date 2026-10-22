@@ -57,19 +57,27 @@ class PoseStripWidget(QtWidgets.QWidget):
     全アトリビュートにキーがあるマーカーは塗りつぶしの菱形、一部だけなら中抜きの菱形に点、
     現在位置は三角形で描き、色だけに頼らず形でも区別する
 
+    The strip is drawn for the driver by default. For a driven attribute
+    (set_driven_mode), the marks are the values of that attribute, the line
+    is dark red, and the marks cannot be moved.
+
+    既定ではドライバーの線として描く。ドリブンアトリビュートの場合（set_driven_mode）は、
+    マーカーをそのアトリビュートの値とし、線を暗い赤にして、マーカーは動かせない
+
     Signals:
-        scrubStarted (): 左ボタンを押して、ドライバーの値のスライダー操作を始めた
-        scrubbed (float): スライダー操作で、ドライバーの値が決まった
+        scrubStarted (): 左ボタンを押して、スライダー操作を始めた
+        scrubbed (float): スライダー操作で、値が決まった
         scrubFinished (): 左ボタンを離して、スライダー操作を終えた
-        markMoved (float, float): マーカーを中ボタンのドラッグで動かした。元のドライバー値、新しいドライバー値
-        contextTriggered (str, float): コンテキストメニューの項目を選んだ。項目のid、ドライバー値
+        markMoved (float, float): マーカーを中ボタンのドラッグで動かした。元の値、新しい値
+        contextRequested (QtCore.QPoint, object): 右クリックした。画面上の位置と、注目しているマーカーの上なら
+            その値（それ以外はNone）。メニューは受け取った側が出す
     """
 
     scrubStarted = QtCore.Signal()
     scrubbed = QtCore.Signal(float)
     scrubFinished = QtCore.Signal()
     markMoved = QtCore.Signal(float, float)
-    contextTriggered = QtCore.Signal(str, float)
+    contextRequested = QtCore.Signal(QtCore.QPoint, object)
 
     _SIDE = 36
     _RADIUS = 7
@@ -84,10 +92,10 @@ class PoseStripWidget(QtWidgets.QWidget):
         self._marks = ()
         self._current = None
         self._hover = None
-        self._actions = []
         self._drag = None
         self._scrubbing = False
         self._snap_to_marks = True
+        self._driven_mode = False
         self.setMouseTracking(True)
         self.setMinimumHeight(78)
         self.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -112,15 +120,16 @@ class PoseStripWidget(QtWidgets.QWidget):
         self._current = value
         self.update()
 
-    def set_context_actions(self, actions):
-        """Set the items of the context menu shown on a mark.
+    def set_driven_mode(self, enabled):
+        """Draw the strip for a driven attribute, or for the driver.
 
-        マーカー上のコンテキストメニューの項目を設定する
+        ドリブンアトリビュート用、またはドライバー用の線として描く
 
         Args:
-            actions (Sequence[tuple[str, str]]): （項目のid, 表示名）。contextTriggeredで返るのはid
+            enabled (bool): ドリブンアトリビュート用にするか。線を暗い赤にし、マーカーは動かせなくなる
         """
-        self._actions = list(actions)
+        self._driven_mode = enabled
+        self.update()
 
     def set_snap_to_marks(self, enabled):
         """Set whether the slider snaps to a mark near the mouse.
@@ -293,7 +302,7 @@ class PoseStripWidget(QtWidgets.QWidget):
             self._scrub_to(event)
             return
 
-        if event.button() == QtCore.Qt.MiddleButton and not self._scrubbing:
+        if event.button() == QtCore.Qt.MiddleButton and not self._scrubbing and not self._driven_mode:
             mark = self._find_mark_at(event.pos())
             if mark is not None:
                 self._start_drag(event, mark)
@@ -324,28 +333,25 @@ class PoseStripWidget(QtWidgets.QWidget):
 
     def contextMenuEvent(self, event):
         mark = self._find_mark_at(event.pos())
-        if mark is None or not mark.focused or not self._actions:
-            return
+        value = None
+        if mark is not None and mark.focused:
+            value = mark.value
 
-        menu = QtWidgets.QMenu(self)
-        for action_id, text in self._actions:
-            menu.addAction(text).setData(action_id)
-
-        chosen = menu.exec_(event.globalPos())
-        if chosen is not None:
-            self.contextTriggered.emit(chosen.data(), mark.value)
+        self.contextRequested.emit(event.globalPos(), value)
 
     def paintEvent(self, event):
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.Antialiasing)
         if not self._marks:
             painter.setPen(QtGui.QColor("#8a8a8a"))
-            painter.drawText(self.rect(), QtCore.Qt.AlignCenter, tr("No keys on the driver"))
+            hint = "No keys on the driven attribute" if self._driven_mode else "No keys on the driver"
+            painter.drawText(self.rect(), QtCore.Qt.AlignCenter, tr(hint))
             return
 
         values, fractions, xs = self._layout_marks()
         y = self._LINE_Y
-        painter.setPen(QtGui.QPen(QtGui.QColor("#8a8a8a"), 1))
+        line_color = "#8c3030" if self._driven_mode else "#8a8a8a"
+        painter.setPen(QtGui.QPen(QtGui.QColor(line_color), 1))
         painter.drawLine(self._SIDE - 10, y, self.width() - self._SIDE + 10, y)
 
         metrics = painter.fontMetrics()

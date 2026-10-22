@@ -958,6 +958,24 @@ def list_linked_keys(node_names=None):
     return linked
 
 
+def read_curve_values(curve):
+    """Read the values that an animCurve takes at its keys, which are the values of the driven attribute.
+
+    animCurveのキーが取る値（ドリブンアトリビュートの値）を読む
+
+    Args:
+        curve (str): animCurveノード名
+
+    Returns:
+        tuple[float, ...]: キーの値。昇順。キーがなければ空
+    """
+    values = cmds.keyframe(curve, q=True, vc=True)
+    if values is None:
+        return ()
+
+    return tuple(sorted(values))
+
+
 def list_scene_driven_keys():
     """List every driven key in the scene as rows for the viewer.
 

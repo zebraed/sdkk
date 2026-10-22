@@ -10,6 +10,7 @@ from ..vendor.Qt import QtCompat, QtCore, QtGui, QtWidgets
 
 from .. import gui_ops, ops, service
 from ..core.history import DEFAULT_LIMIT, MAX_LIMIT, push_history
+from ..core.pose_keys import summarize_pose_keys
 from ..i18n import tr
 from ..core.setup_state import AXES, TRANSFORM_KINDS, DriverSpec, SetupState
 from ..core.state import Role
@@ -64,6 +65,8 @@ class SetupPage(QtWidgets.QWidget):
         self._pending_structure = False
         self._pending_keys = False
         self._scrub = None
+        self._slider_target = None
+        self._slider_driver = None
         self._tracked = ()
         self._scene_reader = service.SetupSceneReader()
         self._history = service.read_history()
@@ -252,7 +255,6 @@ class SetupPage(QtWidgets.QWidget):
         self._find(QtWidgets.QWidget, "holder_pose_target").layout().addWidget(self._combo_target)
 
         self._strip = PoseStripWidget()
-        self._strip.set_context_actions([("delete", tr("Delete Key"))])
         self._strip.set_snap_to_marks(self._snap_to_keys.isChecked())
         self._find(QtWidgets.QWidget, "holder_pose_strip").layout().addWidget(self._strip)
 
@@ -326,13 +328,13 @@ class SetupPage(QtWidgets.QWidget):
         self._strip.scrubbed.connect(self._on_scrubbed)
         self._strip.scrubFinished.connect(self._on_scrub_finished)
         self._strip.markMoved.connect(self._on_mark_moved)
-        self._strip.contextTriggered.connect(self._on_strip_action)
+        self._strip.contextRequested.connect(self._on_strip_menu)
+        self._check_driven_edit.toggled.connect(self._on_driven_edit_toggled)
         self._presets.presetClicked.connect(self._on_preset_clicked)
         self._btn_key.clicked.connect(self._on_key_clicked)
 
     # --- state ---
     def _on_language_changed(self):
-        self._strip.set_context_actions([("delete", tr("Delete Key"))])
         self._refresh()
 
     def _set_state(self, state):
@@ -364,6 +366,7 @@ class SetupPage(QtWidgets.QWidget):
                 self._state, self._current_uuid, self._resolve_target_uuids(),
             )
             self._record_history_if_driven()
+            self._validate_slider_target()
             names = tuple(info.name for info in self._snapshot.nodes.values())
             names += tuple(
                 item.curve
@@ -1039,6 +1042,21 @@ class SetupPage(QtWidgets.QWidget):
 
     def _on_scrub_started(self):
         snapshot = self._snapshot
+        axis = self._get_slider_axis()
+        if axis is not None:
+            key, plug, value, _ = axis
+            self._scrub = {
+                "plug": plug,
+                "start": value,
+                "offset": 0.0,
+                "read": plug,
+                "name": self._get_slider_label(key),
+                "held": None,
+                "value": None,
+                "error": None,
+            }
+            return
+
         plug = snapshot.driver_plug
         start = snapshot.driver_value
         if snapshot.control_plug is not None:
@@ -1049,7 +1067,8 @@ class SetupPage(QtWidgets.QWidget):
             "plug": plug,
             "start": start,
             "offset": None if snapshot.driver_value is None else start - snapshot.driver_value,
-            "driver": snapshot.driver_plug,
+            "read": snapshot.driver_plug,
+            "name": None,
             "held": self._read_held_pose(),
             "value": None,
             "error": None,
@@ -1069,8 +1088,12 @@ class SetupPage(QtWidgets.QWidget):
 
         scrub["value"] = target
         # コントロールを動かした場合、ドライバーがいくつになったかは読まないと分からない
-        driver_values = service.read_plug_values([scrub["driver"]])
-        text = _format(driver_values.get(scrub["driver"]), 3)
+        shown = service.read_plug_values([scrub["read"]]).get(scrub["read"])
+        text = _format(shown, 3)
+        if scrub["name"] is not None:
+            self._label_pose_driver.setText(tr("{name} : {value}", name=scrub["name"], value=text))
+            return
+
         self._label_pose_driver.setText(tr("Driver : {value}", value=text))
         self._label_driver_value.setText(text)
 
@@ -1114,16 +1137,91 @@ class SetupPage(QtWidgets.QWidget):
         if error is not None:
             self._notify(error)
 
-    def _on_strip_action(self, action_id, value):
+    def _on_strip_menu(self, global_pos, value):
+        menu = QtWidgets.QMenu(self)
+        delete = None
+        if value is not None and self._slider_target is None:
+            delete = menu.addAction(tr("Delete Key"))
+            menu.addSeparator()
+
+        to_driver = menu.addAction(tr("Switch to Driver"))
+        to_driver.setEnabled(self._slider_target is not None)
+        submenu = menu.addMenu(tr("Switch to Driven"))
+        actions = {}
+        for key, label in self._list_slider_targets():
+            action = submenu.addAction(label)
+            action.setCheckable(True)
+            action.setChecked(key == self._slider_target)
+            actions[action] = key
+
+        submenu.setEnabled(self._check_driven_edit.isChecked() and bool(actions))
+        chosen = menu.exec_(global_pos)
+        if delete is not None and chosen is delete:
+            self._delete_keys_at(value)
+        elif chosen is to_driver:
+            self._set_slider_target(None)
+        elif chosen in actions:
+            self._set_slider_target(actions[chosen])
+
+    def _delete_keys_at(self, value):
         snapshot = self._snapshot
-        if action_id == "delete" and snapshot.driver_plug is not None:
-            ops.remove_driven_keys_at(snapshot.driver_plug, snapshot.key_plugs, value)
-            print_commands(format_call("remove_driven_keys_at", {
-                "driver": shorten_name(snapshot.driver_plug),
-                "driven_plugs": shorten_names(snapshot.key_plugs),
-                "driver_value": value,
-            }))
-            self._refresh()
+        if snapshot.driver_plug is None:
+            return
+
+        ops.remove_driven_keys_at(snapshot.driver_plug, snapshot.key_plugs, value)
+        print_commands(format_call("remove_driven_keys_at", {
+            "driver": shorten_name(snapshot.driver_plug),
+            "driven_plugs": shorten_names(snapshot.key_plugs),
+            "driver_value": value,
+        }))
+        self._refresh()
+
+    def _list_slider_targets(self):
+        index = self._scene_reader.index
+        if index is None:
+            return []
+
+        targets = []
+        for key in index.enabled_plugs:
+            info = self._snapshot.nodes.get(key[0])
+            if info is not None:
+                targets.append((key, f"{info.short_name}.{key[1]}"))
+
+        return targets
+
+    def _set_slider_target(self, key):
+        self._slider_target = key
+        self._slider_driver = self._state.driver
+        self._render()
+
+    def _on_driven_edit_toggled(self, checked):
+        if not checked and self._slider_target is not None:
+            self._set_slider_target(None)
+
+    def _validate_slider_target(self):
+        if self._slider_target is None:
+            return
+
+        index = self._scene_reader.index
+        if self._state.driver != self._slider_driver or self._slider_target not in index.enabled_plugs:
+            self._slider_target = None
+
+    def _get_slider_label(self, key):
+        return f"{self._snapshot.nodes[key[0]].short_name}.{key[1]}"
+
+    def _get_slider_axis(self):
+        key = self._slider_target
+        index = self._scene_reader.index
+        if key is None or index is None or key not in index.enabled_plugs:
+            return None
+
+        value = self._snapshot.values.get(key)
+        if value is None:
+            return None
+
+        item = index.inputs.get(key)
+        curve = item.curve if item is not None and item.direct else None
+        return key, index.enabled_plugs[key], value, curve
 
     def _on_preset_clicked(self, value):
         snapshot = self._snapshot
@@ -1131,12 +1229,17 @@ class SetupPage(QtWidgets.QWidget):
             return
 
         plug = snapshot.driver_plug
-        if snapshot.control_plug is not None:
+        held = self._read_held_pose()
+        axis = self._get_slider_axis()
+        if axis is not None:
+            plug = axis[1]
+            held = None
+        elif snapshot.control_plug is not None:
             plug = snapshot.control_plug
 
         error = None
         try:
-            gui_ops.apply_driver_preset(plug, value, self._read_held_pose())
+            gui_ops.apply_driver_preset(plug, value, held)
         except RuntimeError as exc:
             error = "⚠ " + tr("Cannot move {plug}: {exc}", plug=plug, exc=exc)
 
@@ -1313,9 +1416,21 @@ class SetupPage(QtWidgets.QWidget):
         snapshot = self._snapshot
         summary = snapshot.summary
         status = summary.status
-        self._strip.set_marks(summary.marks)
-        self._strip.set_current(snapshot.driver_value if snapshot.driver_plug else None)
-        self._label_pose_driver.setText(tr("Driver : {value}", value=_format(snapshot.driver_value, 3)))
+        axis = self._get_slider_axis()
+        self._strip.set_driven_mode(axis is not None)
+        if axis is None:
+            self._strip.set_marks(summary.marks)
+            self._strip.set_current(snapshot.driver_value if snapshot.driver_plug else None)
+            self._label_pose_driver.setText(tr("Driver : {value}", value=_format(snapshot.driver_value, 3)))
+        else:
+            key, plug, value, curve = axis
+            values = () if curve is None else service.read_curve_values(curve)
+            self._strip.set_marks(summarize_pose_keys({plug: values}, value).marks)
+            self._strip.set_current(value)
+            self._label_pose_driver.setText(
+                tr("{name} : {value}", name=self._get_slider_label(key), value=_format(value, 3)),
+            )
+
         self._label_key_status.setText(status.describe(summary.keyed, summary.total, translate=tr))
         self._btn_key.setText(tr(status.button_text))
         self._btn_key.setEnabled(snapshot.driver_plug is not None and bool(snapshot.key_plugs))
