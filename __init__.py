@@ -6,7 +6,7 @@ __copyright__ = "Copyright 2019-2026, zebraed"
 __license__ = "MIT"
 __email__ = "contact@sarygamysh.com"
 __status__ = "Stable"
-__version__ = "2.0.0"
+__version__ = "2.1.0"
 
 import importlib
 from typing import TYPE_CHECKING
