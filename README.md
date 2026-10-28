@@ -4,6 +4,8 @@
 
 # SDKK
 
+[日本語版](README.ja.md)
+
 A Set Driven Key tool for Maya. Pose on the timeline or in the viewport, key it with one button, and manage, mirror, export, and import driven keys without opening the Graph Editor.
 
 ## Description
@@ -15,7 +17,7 @@ SDKK builds and manages driven keys (SDK) from a single window.
 - **Mirror**: copy driven keys to the opposite side by a name rule (for example `_L` to `_R`), with per-key control over inverting the driver axis and the value.
 - **Advanced**: convert animation keyed on the timeline into driven keys.
 
-Every operation is a single undo step, and every GUI action prints the equivalent Python command to the Script Editor, so you can turn a manual workflow into a script.
+Every operation is a single undo step, and every GUI action prints the equivalent Python command to the Script Editor.
 
 ## Requirements
 
@@ -54,19 +56,52 @@ Opening the window again closes the previous one and opens a new one.
 
 ### Setup
 
-The **Setup** tab creates driven keys. The **pose area** at the bottom of the window (pose strip, presets, **Driven Edit**, and the key button) is always visible, whichever tab is open.
+The **Setup** tab creates driven keys.
 
-1. **Set the driver.** Select the driver node in Maya and press **Set Selected**, then choose the driver attribute: one of the nine transform attributes (TX to SZ), or any other attribute through **Other**. Attributes that already drive a driven key are marked.
-2. **Add the driven nodes.** Select the nodes in Maya and press **+ Add**. Click a row in the table to edit that node's attributes.
+1. **Set the driver.** Select the driver node in Maya and press **+ Set Selected**, then choose the driver attribute: one of the nine transform attributes (TX to SZ).
+2. **Add the driven nodes.** Select the nodes in Maya and press **+ Add**.
 3. **Choose the driven attributes.** Toggle the transform cells (TX to SZ) of the selected node, or use **Other** for any other attribute.
-   - A cell with an orange border is enabled (it is keyed together with the others).
-   - Amber fill: the attribute is already driven by the current driver.
-   - Blue-gray fill: the attribute is driven by another driver.
-   - A cell that cannot be keyed (locked, missing, or already connected to something else) is disabled, and the reason is shown in its tooltip.
-4. **Move the driver and pose the driven nodes.** Drag on the pose strip, or use the preset buttons. A preset button adds its number to the driver (the `0` button sets the driver to 0). Middle-click a preset button to edit its number.
-5. **Press the key button.** It keys every enabled driven attribute of the selected rows (or the displayed node if no row is selected) at the current driver value. The button reads **SET KEY**, **SET / UPDATE KEY**, or **UPDATE KEY** depending on how many attributes already have a key there.
+4. **Move the driver and pose the driven nodes.** Drag on the pose strip, or use the preset buttons.
+5. **Press the key button.** It keys every enabled driven attribute of the selected rows (or the displayed node if no row is selected) at the current driver value.
 
-**Driven Edit** keeps the driven nodes in their current pose while you move the driver with the strip or the presets. Use it to key the held pose at a new driver value.
+**Driven Edit** keeps the driven nodes in their current pose while you move the driver with the strip or the presets.
+
+#### The driver
+
+The screenshots show the Japanese UI.
+
+**Transform** chooses one of the nine transform attributes (TX to SZ).
+
+<img src="resource/sdkk_doc_scs01_JA.png" alt="The driver group with Transform selected" width="480">
+
+**Other** chooses any other attribute of the node from a list that you can search.
+
+<img src="resource/sdkk_doc_scs02_JA.png" alt="The driver group with Other selected" width="480">
+
+- **Control**: the attribute that moves the driver when the driver cannot be moved directly, for example when a controller drives it through an input connection. Select the controller's attribute in the Channel Box and press **+ Set Selected** next to **Control** (or right-click the row and choose **Set from Channel Box**). The pose strip and the presets then move the control by the same amount, and the keys are set at the driver value that results. **Clear** in the right-click menu removes the control. Choosing another driver attribute also clears it.
+
+#### The driven nodes
+
+<img src="resource/sdkk_doc_scs03_JA.png" alt="The driven group" width="480">
+
+- Click a row to edit that node's attributes below the table. Select several rows to key them together.
+- Click the node name under the table to select the node in Maya.
+- **Transform**: click a cell to enable that attribute.
+- **Other**: pick from a list that you can search to add an attribute that is not a transform attribute.
+
+<img src="resource/sdkk_doc_scs05_JA.png" alt="The search popup of Other" width="480">
+
+Right-click a row for these menus. The menu on a transform cell or on an entry of the **Other** list has only the items that apply to that attribute.
+
+<img src="resource/sdkk_doc_scs04_JA.png" alt="The right-click menu of the driven table" width="480">
+
+- **Reload**: reads the scene again and redraws the window.
+- **Set Driver from Driven Keys**: lists the attributes that already drive the selected nodes. Pick one to set it as the driver.
+- **Select Anim Curve**: selects the animCurve (and blendWeighted) nodes in Maya.
+- **Edit Anim Curve**: opens the Graph Editor with the animCurve selected and framed, ready to edit its keys.
+- **Remove Item**: removes the node or attribute from the setup (it does not touch the scene). Available on node rows and on entries of the **Other** list.
+- **Delete Current Driver Key**: deletes the keys of the current driver on that attribute.
+- **Delete All Keys on Attribute**: deletes every driven key on that attribute, from every driver. A confirmation dialog appears first.
 
 #### The pose strip
 
@@ -78,22 +113,13 @@ The **Setup** tab creates driven keys. The **pose area** at the bottom of the wi
 
 A filled diamond is a key on every attribute, a hollow diamond with a dot is a key on some attributes, and the triangle is the current driver value.
 
-#### Right-click menus
-
-Right-click a driven node row, a transform cell, or an entry in the **Other** list for:
-
-- **Select Anim Curve**: selects the animCurve (and blendWeighted) nodes in Maya.
-- **Delete Current Driver Key**: deletes the keys of the current driver on that attribute.
-- **Delete All Keys on Attribute**: deletes every driven key on that attribute, from every driver. A confirmation dialog appears first.
-- **Remove Item**: removes the node or attribute from the setup (it does not touch the scene). Available on node rows and on entries of the **Other** list.
-
 #### History
 
 The **History** menu lists the driver and driven sets you have worked with, newest first. Pick one to restore it on the Setup tab. Nodes that no longer exist are reported in the status bar.
 
 ### I/O
 
-The **I/O** tab exports and imports driven keys as JSON. **Tools > Export Driven Key...** and **Tools > Import Driven Key...** open the same two sections as separate windows, so you can keep them next to the main window.
+The **I/O** tab exports and imports driven keys as JSON. **Tools > Export Driven Key...** and **Tools > Import Driven Key...** open the same two sections as separate windows.
 
 **Export**
 
@@ -120,7 +146,7 @@ The **Mirror** tab copies driven keys to the opposite side by a name rule.
    - **Invert Value**: the driven attributes whose values are negated by default (for example `TX`).
    - **Invert Driver**: the driver attributes whose input axis is negated by default.
 2. Under **TARGETS**, choose **Driver** or **Driven**, then press **Load from Selection** or **Load from Scene**.
-3. Review the table. Each row shows the source, the mirrored result, and a status. **Inv Driver** and **Inv Value** can be changed per row, and a changed flag stays with that driven key.
+3. Review the table. **Inv Driver** and **Inv Value** can be changed per row, and a changed flag stays with that driven key.
 4. Check the rows to mirror and press **Mirror**. Rows that are `not_mirrored` or `different` are checked automatically.
 
 | Status | Meaning |
@@ -134,7 +160,7 @@ The **Mirror** tab copies driven keys to the opposite side by a name rule.
 
 ### Advanced
 
-The **Advanced** tab converts animation keyed on the timeline into driven keys, so you can pose on the timeline instead of building curves in the Graph Editor.
+The **Advanced** tab converts animation keyed on the timeline into driven keys.
 
 1. In **Setup**, set the driver and add the driven nodes.
 2. Animate the driven nodes on the timeline while the driver moves through the values you want.
@@ -153,9 +179,21 @@ The driver has to keep increasing or decreasing across the keys. A motion that r
 
 The window size, the options, the presets, the mirror rule, and the history are saved between sessions.
 
+### Help
+
+**Help > Open Web Document Page...** opens the document page in the browser. The URL is the `document_url` of the bundled `config/document.json`.
+
+```json
+{
+  "document_url": "https://example.com/sdkk"
+}
+```
+
+To use another JSON file, set the environment variable `SDKK_DOCUMENT_CONFIG` to its path. A file that is named but cannot be read is not replaced by the bundled one; a warning is shown in the status bar instead. Only `http` and `https` URLs are opened.
+
 ### Script
 
-Everything the GUI does is available from Python through `import sdkk`. The Script Editor shows the exact call for each GUI action.
+Everything the GUI does is available from Python through `import sdkk`.
 
 ```python
 import sdkk
