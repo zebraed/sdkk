@@ -1,7 +1,7 @@
 """
 Operations only the GUI needs. Not part of the public API, so not exported from the package.
 
-GUIだけが使う操作。公開APIではないため、パッケージ直下には公開しない
+GUIだけが使う操作。公開APIではない。
 """
 import functools
 
@@ -70,6 +70,39 @@ def apply_driver_preset(driver, value, held=None):
     target = 0.0 if value == 0 else cmds.getAttr(driver) + value
     cmds.setAttr(driver, target)
     _restore_values(held)
+
+
+def measure_control_gain(control, driver, step=1.0):
+    """Return how much the driver moves per unit of the control, by moving the control a little and back.
+
+    コントロールを少し動かして戻し、コントロール1あたりにドライバーが動く量を返す
+
+
+    Args:
+        control (str): ドライバーの代わりに動かすアトリビュート
+        driver (str): ドライバーアトリビュート
+        step (float): 試しに動かす量
+
+    Returns:
+        float: ドライバーの変化量÷コントロールの変化量。ドライバーが動かなければ0.0
+
+    Raises:
+        RuntimeError: コントロールがロックされている、または入力があって設定できない場合
+    """
+    with suspend_undo():
+        start = cmds.getAttr(control)
+        before = cmds.getAttr(driver)
+        for delta in (step, -step):
+            cmds.setAttr(control, start + delta)
+            try:
+                change = cmds.getAttr(driver) - before
+            finally:
+                cmds.setAttr(control, start)
+
+            if abs(change) > 1e-6:
+                return change / delta
+
+    return 0.0
 
 
 def show_in_graph_editor(curve):

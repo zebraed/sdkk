@@ -239,6 +239,7 @@
   "Not found in the scene: {names}": "シーンに見つかりません: {names}",
   "Cannot move the key: {exc}": "キーを移動できません: {exc}",
   "Cannot move {plug}: {exc}": "{plug}を動かせません: {exc}",
+  "Moving control does not change the driver": "コントローラを動かしても、ドライバーが変わりません。異なるコントローラーの可能性があります",
   "Key failed: {exc}": "キーの設定に失敗しました: {exc}",
   "{attr} (drives driven keys)": "{attr} (ドリブンキーを動かします)",
 

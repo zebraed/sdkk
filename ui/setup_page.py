@@ -527,10 +527,27 @@ class SetupPage(QtWidgets.QWidget):
             return
 
         self._set_control(control)
+        # 設定はそのまま残す。あとで接続をつなぐ場合もあるため、警告だけ出す
+        snapshot = self._snapshot
+        if snapshot.control_plug is not None and snapshot.driver_plug is not None:
+            self._measure_control_gain(snapshot)
 
     def _set_control(self, control):
         driver = self._state.driver.with_control(control)
         self._set_state(self._state.with_driver(driver))
+
+    def _measure_control_gain(self, snapshot):
+        try:
+            gain = gui_ops.measure_control_gain(snapshot.control_plug, snapshot.driver_plug)
+        except RuntimeError as exc:
+            self._notify("⚠ " + tr("Cannot move {plug}: {exc}", plug=snapshot.control_plug, exc=exc))
+            return None
+
+        if gain == 0.0:
+            self._notify("⚠ " + tr("Moving control does not change the driver"))
+            return None
+
+        return gain
 
     def _on_driver_mode_toggled(self, checked):
         if self._rendering:
@@ -1048,7 +1065,8 @@ class SetupPage(QtWidgets.QWidget):
             self._scrub = {
                 "plug": plug,
                 "start": value,
-                "offset": 0.0,
+                "origin": value,
+                "gain": 1.0,
                 "read": plug,
                 "name": self._get_slider_label(key),
                 "held": None,
@@ -1059,14 +1077,23 @@ class SetupPage(QtWidgets.QWidget):
 
         plug = snapshot.driver_plug
         start = snapshot.driver_value
+        gain = 1.0
         if snapshot.control_plug is not None:
+            # 試しに動かした変更の通知で、ドラッグ中の再描画が予約されないよう、先に操作中にしておく
+            self._scrub = {"plug": None}
+            gain = self._measure_control_gain(snapshot)
+            if gain is None:
+                self._scrub = None
+                return
+
             plug = snapshot.control_plug
             start = snapshot.control_value
 
         self._scrub = {
             "plug": plug,
             "start": start,
-            "offset": None if snapshot.driver_value is None else start - snapshot.driver_value,
+            "origin": snapshot.driver_value,
+            "gain": gain,
             "read": snapshot.driver_plug,
             "name": None,
             "held": self._read_held_pose(),
@@ -1079,7 +1106,8 @@ class SetupPage(QtWidgets.QWidget):
         if scrub is None or scrub["plug"] is None:
             return
 
-        target = value + scrub["offset"]
+        # スライダーはドライバーの値で動く。コントロールを動かす場合は、測った倍率で換算する
+        target = scrub["start"] + (value - scrub["origin"]) / scrub["gain"]
         try:
             gui_ops.preview_driver_value(scrub["plug"], target, scrub["held"])
         except RuntimeError as exc:
@@ -1235,7 +1263,13 @@ class SetupPage(QtWidgets.QWidget):
             plug = axis[1]
             held = None
         elif snapshot.control_plug is not None:
+            gain = self._measure_control_gain(snapshot)
+            if gain is None:
+                return
+
             plug = snapshot.control_plug
+            # プリセットの量はドライバーの値なので、コントロールの量に換算する。0はコントロールを0に戻す
+            value = value / gain
 
         error = None
         try:
