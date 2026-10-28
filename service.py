@@ -4,6 +4,7 @@ Read-only queries for the GUI. Never changes the scene.
 GUI向けの読み取り専用のクエリ
 """
 import json
+import os
 import re
 from dataclasses import dataclass, replace
 from typing import Optional
@@ -11,6 +12,7 @@ from typing import Optional
 from maya import cmds
 
 from .command import animation, drivenkey, scene
+from .core.document_config import parse_document_url
 from .core.history import MAX_LIMIT, HistoryEntry, parse_history
 from .i18n import tr
 from .core.model import Plug
@@ -20,6 +22,8 @@ from .core.state import Role, Status
 
 SETTINGS_KEY = "sdkk_window_settings"
 HISTORY_KEY = "sdkk_history"
+DOCUMENT_CONFIG_ENV = "SDKK_DOCUMENT_CONFIG"
+DOCUMENT_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config", "document.json")
 POSE_TOLERANCE = 1e-4
 
 _DAG_PATH = re.compile(r"(?:\|[A-Za-z0-9_:]+)+")
@@ -1074,6 +1078,41 @@ def select_node(uuid):
     name = scene.find_node(uuid)
     if name is not None:
         cmds.select(name, r=True)
+
+
+def read_document_url():
+    """Read the URL of the document page.
+
+    ドキュメントのページのURLを読む
+
+    The bundled config/document.json is read, unless the environment
+    variable SDKK_DOCUMENT_CONFIG names another JSON file. A file that is
+    named but cannot be used is an error, and the bundled one is not used
+    in its place, so that a wrong path is noticed.
+
+    同梱のconfig/document.jsonを読む。環境変数SDKK_DOCUMENT_CONFIGが別のJSONファイルを指す場合は、
+    そちらを読む。指したファイルが使えないときはエラーにして、同梱のファイルへは切り替えない。
+    パスの間違いに気付けるようにするため
+
+    Returns:
+        str: URL
+
+    Raises:
+        ValueError: ファイルを読めない、またはURLとして使えない場合。メッセージには、読もうとしたパスを含む
+    """
+    path = os.environ.get(DOCUMENT_CONFIG_ENV) or DOCUMENT_CONFIG_PATH
+    try:
+        with open(path, encoding="utf-8") as stream:
+            text = stream.read()
+    except OSError as exc:
+        raise ValueError(f"{path}: {exc.strerror or exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise ValueError(f"{path}: Not a UTF-8 file") from exc
+
+    try:
+        return parse_document_url(text)
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from exc
 
 
 def read_settings():

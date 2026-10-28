@@ -1,10 +1,12 @@
 """
 Small widgets that do not depend on the rest of sdkk.
 
-A collapsible group, a hint over an empty view, and a label that is cut with an ellipsis.
+A collapsible group, a hint over an empty view, a label that is cut with an ellipsis,
+and the check boxes of a table: a delegate for the cells and a header that sums up a column.
 
 sdkkのほかの部分に依存しない、小さなWidget
 折りたたみグループ、空のビューの案内、省略記号で切るラベル
+表のチェックボックス（セルに描くデリゲートと、列をまとめる見出し）
 """
 from ...vendor.Qt import QtCore, QtGui, QtWidgets
 
@@ -244,6 +246,185 @@ class EmptyHint(QtWidgets.QLabel):
 
     def _update_visibility(self, *_args):
         self.setVisible(self._model.rowCount() == 0)
+
+
+_CHECK_BOX_SIZE = 14
+
+
+def paint_check_box(painter, rect, state, enabled=True):
+    """Draw a check box in the center of a rectangle.
+
+    矩形の中央にチェックボックスを描く
+
+    Maya's style draws a check box of an item view or a QCheckBox with
+    almost no frame, so an unchecked box cannot be seen on a dark table.
+    The box is drawn here with a frame that shows on the dark background.
+
+    Mayaのスタイルは、表のチェックもQCheckBoxの印も、ほとんど枠なしで描くため、暗い表では外れたチェックが見えない
+    そのため、暗い背景でも見える枠を付けて、ここで描く
+
+    Args:
+        painter (QtGui.QPainter): 描画先
+        rect (QtCore.QRect): 中央に描く矩形
+        state (QtCore.Qt.CheckState): チェック状態
+        enabled (bool): 操作できる見た目にするか
+    """
+    box = QtCore.QRectF(0, 0, _CHECK_BOX_SIZE, _CHECK_BOX_SIZE)
+    box.moveCenter(QtCore.QRectF(rect).center())
+    border = QtGui.QColor("#a0a0a0")
+    fill = QtGui.QColor("#262626")
+    if state != QtCore.Qt.Unchecked:
+        border = QtGui.QColor("#5285a6")
+        fill = QtGui.QColor("#5285a6")
+
+    if not enabled:
+        border = QtGui.QColor("#5a5a5a")
+        fill = QtGui.QColor("#333333")
+
+    painter.save()
+    painter.setRenderHint(QtGui.QPainter.Antialiasing)
+    painter.setPen(QtGui.QPen(border, 1))
+    painter.setBrush(fill)
+    painter.drawRoundedRect(box.adjusted(0.5, 0.5, -0.5, -0.5), 2, 2)
+
+    pen = QtGui.QPen(QtGui.QColor("#ffffff"), 2)
+    pen.setCapStyle(QtCore.Qt.RoundCap)
+    pen.setJoinStyle(QtCore.Qt.RoundJoin)
+    painter.setPen(pen)
+    left = box.left()
+    top = box.top()
+    size = box.width()
+    if state == QtCore.Qt.Checked:
+        painter.drawPolyline(QtGui.QPolygonF([
+            QtCore.QPointF(left + size * 0.24, top + size * 0.52),
+            QtCore.QPointF(left + size * 0.42, top + size * 0.70),
+            QtCore.QPointF(left + size * 0.76, top + size * 0.32),
+        ]))
+    elif state == QtCore.Qt.PartiallyChecked:
+        painter.drawLine(
+            QtCore.QPointF(left + size * 0.28, top + size * 0.5),
+            QtCore.QPointF(left + size * 0.72, top + size * 0.5),
+        )
+
+    painter.restore()
+
+
+class CheckBoxDelegate(QtWidgets.QStyledItemDelegate):
+    """Draws the check state of a cell as a check box in its center, and toggles it on a click anywhere in the cell.
+
+    セルのチェック状態を、中央のチェックボックスとして描き、セルのどこを押しても切り替える
+
+    Qt toggles a check only on a click on its small mark, which Maya's style
+    does not draw while unchecked. Use it on columns that show only a check state.
+
+    Qtはチェックの小さな印を押したときだけ切り替えるが、Mayaのスタイルは外れた印を描かない
+    チェックだけを出す列に使う
+
+    Args:
+        parent (Optional[QtCore.QObject]): 親
+    """
+
+    _MARGIN = 4
+
+    def paint(self, painter, option, index):
+        widget = option.widget
+        style = QtWidgets.QApplication.style()
+        if widget is not None:
+            style = widget.style()
+
+        style.drawPrimitive(QtWidgets.QStyle.PE_PanelItemViewItem, option, painter, widget)
+        state = index.data(QtCore.Qt.CheckStateRole)
+        if state is None:
+            return
+
+        enabled = bool(index.flags() & QtCore.Qt.ItemIsEnabled)
+        paint_check_box(painter, option.rect, state, enabled)
+
+    def sizeHint(self, option, index):
+        size = _CHECK_BOX_SIZE + self._MARGIN * 2
+        return QtCore.QSize(size, size)
+
+    def editorEvent(self, event, model, option, index):
+        flags = index.flags()
+        if not flags & QtCore.Qt.ItemIsUserCheckable or not flags & QtCore.Qt.ItemIsEnabled:
+            return False
+
+        if event.type() != QtCore.QEvent.MouseButtonRelease or event.button() != QtCore.Qt.LeftButton:
+            return False
+
+        if not option.rect.contains(event.pos()):
+            return False
+
+        state = QtCore.Qt.Checked
+        if index.data(QtCore.Qt.CheckStateRole) == QtCore.Qt.Checked:
+            state = QtCore.Qt.Unchecked
+
+        return model.setData(index, state, QtCore.Qt.CheckStateRole)
+
+
+class CheckHeaderView(QtWidgets.QHeaderView):
+    """A horizontal header that draws, on the given sections, a check box that sums up the checks of the column.
+
+    指定した列の見出しに、その列のチェックをまとめたチェックボックスを描く横の見出し
+
+    The box is checked when every row is checked, unchecked when none is,
+    and partly checked otherwise. A click is told by sectionClicked, as on
+    any section, and the page decides what to change.
+
+    すべての行にチェックがあれば入り、1行もなければ外れ、それ以外は一部の状態になる
+    クリックはほかの見出しと同じくsectionClickedで伝え、何を変えるかはページが決める
+
+    Args:
+        sections (Iterable[int]): チェックボックスを描く列
+        parent (Optional[QtWidgets.QWidget]): 親
+    """
+
+    def __init__(self, sections, parent=None):
+        super().__init__(QtCore.Qt.Horizontal, parent)
+        self._sections = frozenset(sections)
+        self._watched = None
+        self.setSectionsClickable(True)
+
+    def setModel(self, model):  # pylint: disable=invalid-name
+        if self._watched is not None:
+            self._watched.dataChanged.disconnect(self._on_model_changed)
+            self._watched.modelReset.disconnect(self._on_model_changed)
+
+        super().setModel(model)
+        self._watched = model
+        if model is not None:
+            model.dataChanged.connect(self._on_model_changed)
+            model.modelReset.connect(self._on_model_changed)
+
+    def paintSection(self, painter, rect, logical_index):  # pylint: disable=invalid-name
+        # 基底のpaintSectionは、空のクリップを残して返すため、そのあとに描いても何も出ない
+        painter.save()
+        super().paintSection(painter, rect, logical_index)
+        painter.restore()
+        if logical_index not in self._sections or self.model() is None:
+            return
+
+        rows = self.model().rowCount()
+        paint_check_box(painter, rect, self._get_column_state(logical_index), rows > 0)
+
+    def _get_column_state(self, column):
+        model = self.model()
+        rows = model.rowCount()
+        checked = 0
+        for row in range(rows):
+            if model.index(row, column).data(QtCore.Qt.CheckStateRole) == QtCore.Qt.Checked:
+                checked += 1
+
+        if rows and checked == rows:
+            return QtCore.Qt.Checked
+
+        if checked:
+            return QtCore.Qt.PartiallyChecked
+
+        return QtCore.Qt.Unchecked
+
+    def _on_model_changed(self, *_args):
+        self.viewport().update()
 
 
 class PopupComboBox(QtWidgets.QComboBox):

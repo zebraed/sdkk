@@ -189,6 +189,8 @@
   "Apply": "適用",
   "Key Slider": "キースライダー",
   "Display Language": "表示言語",
+  "Open Web Document Page...": "ウェブドキュメントのページを開く...",
+  "Cannot open the document page: {exc}": "ドキュメントのページを開けません: {exc}",
   "Switch to Driver": "ドライバーに切り替え",
   "Switch to Driven": "ドリブンに切り替え",
   "No keys on the driven attribute": "ドリブンにキーがありません",

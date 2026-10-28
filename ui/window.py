@@ -1,7 +1,7 @@
 import functools
 import os
 
-from ..vendor.Qt import QtCompat, QtCore, QtWidgets
+from ..vendor.Qt import QtCompat, QtCore, QtGui, QtWidgets
 
 from maya import OpenMayaUI as omui
 from maya.app.general.mayaMixin import MayaQWidgetBaseMixin
@@ -106,6 +106,8 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         delete_all_action.triggered.connect(self._on_delete_all_driven_keys)
         about_action = self.findChild(QtWidgets.QAction, "act_about")
         about_action.triggered.connect(self._on_about)
+        document_action = self.findChild(QtWidgets.QAction, "act_open_web_document")
+        document_action.triggered.connect(self._on_open_web_document)
         self._viewer = None
         self._viewer_size = None
         viewer_action = self.findChild(QtWidgets.QAction, "act_driven_key_viewer")
@@ -115,7 +117,7 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
         preferences_action.triggered.connect(self._show_preferences)
         self._language_actions = {}
         self._build_language_menu()
-        translate.notifier.languageChanged.connect(self._on_language_changed)
+        translate.connect_language_changed(self, self._on_language_changed)
         pose_area = self._page.detach_pose_area()
         pose_area.layout().setContentsMargins(6, 0, 6, 6)
         self.findChild(QtWidgets.QVBoxLayout, "verticalLayout_main").addWidget(pose_area)
@@ -326,6 +328,15 @@ class SdkkWindow(MayaQWidgetBaseMixin, QtWidgets.QMainWindow):
 
         print_commands(format_call("delete_driven_keys", {}, args=(shorten_names(names),)))
         self._show_message(tr("Deleted {count} driven key(s)", count=len(linked)))
+
+    def _on_open_web_document(self, _checked=False):
+        try:
+            url = service.read_document_url()
+        except ValueError as exc:
+            self._show_warning("⚠ " + tr("Cannot open the document page: {exc}", exc=exc))
+            return
+
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def _on_about(self, _checked=False):
         lines = [

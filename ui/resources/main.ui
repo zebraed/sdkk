@@ -163,6 +163,7 @@
     <property name="title">
      <string>Help</string>
     </property>
+    <addaction name="act_open_web_document"/>
     <addaction name="act_about"/>
    </widget>
    <addaction name="menu_history"/>
@@ -247,6 +248,11 @@
    </property>
    <property name="toolTip">
     <string>List the driven keys of the scene, and set them on the Setup tab</string>
+   </property>
+  </action>
+  <action name="act_open_web_document">
+   <property name="text">
+    <string>Open Web Document Page...</string>
    </property>
   </action>
   <action name="act_about">

@@ -18,7 +18,7 @@ from .command_print import format_call, print_commands
 from .maya_events import SceneWatcher
 from .models.tables import MirrorRow, MirrorRowModel, is_fixable
 from .node_selection import select_nodes
-from .widgets.common import CollapsibleGroup, EmptyHint
+from .widgets.common import CheckBoxDelegate, CheckHeaderView, CollapsibleGroup, EmptyHint
 
 UI_PATH = os.path.join(os.path.dirname(__file__), "resources", "mirror_page.ui")
 DEFAULT_DRIVEN_INVERT = ("translateX", "translateY", "translateZ")
@@ -184,6 +184,8 @@ class MirrorPage(QtWidgets.QWidget):
             holder.layout().removeWidget(body)
             group.set_content(body)
             holder.layout().addWidget(group)
+            if holder_name == "holder_targets":
+                group.toggled.connect(self._on_targets_toggled)
 
         self._combo_policy.addItem("", ConflictPolicy.REPLACE)
         self._combo_policy.addItem("", ConflictPolicy.SKIP)
@@ -193,15 +195,20 @@ class MirrorPage(QtWidgets.QWidget):
         for attr, check in self._checks_driven.items():
             check.setChecked(attr in DEFAULT_DRIVEN_INVERT)
 
+        self._table.setHorizontalHeader(CheckHeaderView([0], self._table))
         self._table.setModel(self._model)
         EmptyHint(self._table, "Press Load from Selection or Load from Scene to list the driven keys")
         self._table.verticalHeader().hide()
         self._table.verticalHeader().setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+        delegate = CheckBoxDelegate(self._table)
+        for column in (0, *self._model.CHECK_COLUMNS):
+            self._table.setItemDelegateForColumn(column, delegate)
+
         header = self._table.horizontalHeader()
         header.setStretchLastSection(False)
-        header.setSectionResizeMode(0, QtWidgets.QHeaderView.Stretch)
         header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
-        for column in (2, 3, 4):
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
+        for column in (0, 3, 4, 5):
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.ResizeToContents)
 
     def _connect_signals(self):
@@ -220,6 +227,7 @@ class MirrorPage(QtWidgets.QWidget):
         self._btn_uncheck_all.clicked.connect(self._on_uncheck_all)
         self._btn_clear.clicked.connect(self._on_clear)
         self._table.clicked.connect(self._on_row_clicked)
+        self._table.horizontalHeader().sectionClicked.connect(self._on_header_clicked)
         self._btn_mirror.clicked.connect(self._on_mirror)
         self._model.dataChanged.connect(self._update_summary)
         self._model.invertEdited.connect(self._on_invert_edited)
@@ -270,12 +278,12 @@ class MirrorPage(QtWidgets.QWidget):
 
     def _on_row_clicked(self, index):
         column = index.column()
-        if column in (2, 3) or not self._select_on_click.isChecked():
+        if column in (0, *self._model.CHECK_COLUMNS) or not self._select_on_click.isChecked():
             return
 
         row = self._model.get_row(index.row())
         data = row.source
-        if column == 1:
+        if column == 2:
             data = row.item.target
 
         if data is None:
@@ -380,6 +388,42 @@ class MirrorPage(QtWidgets.QWidget):
 
     def _on_uncheck_all(self, _checked=False):
         self._model.set_all_checked(False)
+
+    def _on_targets_toggled(self, expanded):
+        # 開いている間は表に余りの高さを渡す。たたんだら、見出しが上に残るよう下のスペーサーへ渡す
+        layout = self.layout()
+        targets = layout.indexOf(self._find(QtWidgets.QWidget, "holder_targets"))
+        layout.setStretch(targets, int(expanded))
+        layout.setStretch(targets + 1, int(not expanded))
+
+    def _on_header_clicked(self, column):
+        rows = []
+        for index in range(self._model.rowCount()):
+            rows.append(self._model.get_row(index))
+
+        if not rows:
+            return
+
+        if column == 0:
+            self._model.set_all_checked(len(self._model.list_checked()) != len(rows))
+            return
+
+        attr = self._model.CHECK_COLUMNS.get(column)
+        if attr is None:
+            return
+
+        enabled = False
+        for row in rows:
+            if not getattr(row, attr):
+                enabled = True
+                break
+
+        for row in rows:
+            setattr(row, attr, enabled)
+            row_key = (str(row.source.driver), str(row.source.driven))
+            self._overrides[row_key] = (row.invert_driver, row.invert_driven)
+
+        self._rebuild(keep_checked=True)
 
     def _on_invert_edited(self, index):
         row = self._model.get_row(index)

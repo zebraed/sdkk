@@ -68,7 +68,7 @@ class PreferencesDialog(BaseDialog):
             self._language_radios[code] = radio
 
         self.findChild(QtWidgets.QPushButton, "btn_close").clicked.connect(self.close)
-        translate.notifier.languageChanged.connect(self._on_language_changed)
+        translate.connect_language_changed(self, self._on_language_changed)
         self._on_language_changed()
 
     def _on_language_toggled(self, code, checked):

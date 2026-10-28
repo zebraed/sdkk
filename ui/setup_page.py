@@ -90,7 +90,7 @@ class SetupPage(QtWidgets.QWidget):
             self._schedule_key_refresh,
         )
         self._watcher.start()
-        translate.notifier.languageChanged.connect(self._on_language_changed)
+        translate.connect_language_changed(self, self._on_language_changed)
         self._restore_latest_history()
         self._refresh()
 

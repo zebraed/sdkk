@@ -327,9 +327,16 @@ class MirrorRow:
 
 
 class MirrorRowModel(CheckableRowModel):
-    """Shows the mirror rows: Source, Mirrored, the two invert check boxes, and Status. Rows to fix start checked.
+    """Shows the mirror rows: the row check, Source, Mirrored, the two invert check boxes, and Status.
+    Rows to fix start checked.
 
-    ミラーの行を表示する（Source・Mirrored・反転のチェック2つ・Status）。ミラーが必要な行にチェックを入れて始める
+    ミラーの行を表示する（行のチェック・Source・Mirrored・反転のチェック2つ・Status）
+    ミラーが必要な行にチェックを入れて始める
+
+    The row check has a column of its own, because a row has three lines
+    and a check beside the source name does not show which row it is for.
+
+    1行が3段あり、ソース名の横のチェックではどの行のものか分からないため、行のチェックは専用の列にする
 
     Signals:
         invertEdited (int): 反転のチェックが操作された行
@@ -337,20 +344,19 @@ class MirrorRowModel(CheckableRowModel):
 
     invertEdited = QtCore.Signal(int)
 
-    COLUMNS = ("Source", "Mirrored", "Inv Driver", "Inv Value", "Status")
-    CHECK_COLUMNS = {2: "invert_driver", 3: "invert_driven"}
+    COLUMNS = ("", "Source", "Mirrored", "Inv Driver", "Inv Value", "Status")
+    CHECK_COLUMNS = {3: "invert_driver", 4: "invert_driven"}
 
     def update_item(self, index, item):
-        """Replace the check result of a row. The row is checked if it needs mirroring, and unchecked if not.
+        """Replace the check result of a row. The check of the row stays as the user left it.
 
-        行の確認結果を置き換える。ミラーが必要な行はチェックを入れ、不要な行は外す
+        行の確認結果を置き換える。行のチェックは、ユーザーが操作したままにする
 
         Args:
             index (int): 行の位置
             item (MirrorCheckItem): 新しい確認結果
         """
         self._rows[index].item = item
-        self._checked[index] = is_fixable(self._rows[index])
         self.dataChanged.emit(
             self.index(index, 0), self.index(index, len(self.COLUMNS) - 1),
         )
@@ -363,16 +369,16 @@ class MirrorRowModel(CheckableRowModel):
             self.invertEdited.emit(index)
 
     def format_cell(self, row, column):
-        if column == 0:
+        if column == 1:
             return _format_pair(row.source)
 
-        if column == 1:
+        if column == 2:
             if row.item.target is None:
                 return "-"
 
             return _format_pair(row.item.target)
 
-        if column != 4:
+        if column != 5:
             return None
 
         if row.blocked:
@@ -384,13 +390,13 @@ class MirrorRowModel(CheckableRowModel):
         return tr(row.item.status.value)
 
     def format_tip(self, row, column):
-        if column == 0:
+        if column == 1:
             return f"{row.source.driver} → {row.source.driven}"
 
-        if column == 1 and row.item.target is not None:
+        if column == 2 and row.item.target is not None:
             return f"{row.item.target.driver} → {row.item.target.driven}"
 
-        if column != 4:
+        if column != 5:
             return None
 
         lines = []

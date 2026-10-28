@@ -6,6 +6,11 @@ QTableView, QListWidget {
     outline: 0;
 }
 
+QTableView#table_rows {
+    background-color: #262626;
+    alternate-background-color: #383838;
+}
+
 QLabel#label_context[state="warning"] {
     color: #f5c26b;
     font-weight: bold;
