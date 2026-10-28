@@ -28,6 +28,8 @@ Every operation is a single undo step, and every GUI action prints the equivalen
 
 ## Installation
 
+### In the scripts directory (easy)
+
 1. Copy this repository into a folder named `sdkk` in your Maya scripts directory.
 
    - Windows: `%USERPROFILE%\Documents\maya\scripts\sdkk`
@@ -42,6 +44,23 @@ If you keep the folder somewhere else, add its parent directory to the Python pa
 import sys
 sys.path.insert(0, r"/path/to/parent_of_sdkk")
 ```
+
+### With the module file
+
+1. Download `sdkk-vX.Y.Z.zip` from the [Releases](https://github.com/zebraed/sdkk/releases) page.
+2. Unzip it into your Maya modules directory, so that `sdkk.mod` and the `sdkk` folder sit side by side.
+
+   - Windows: `%USERPROFILE%\Documents\maya\modules`
+   - macOS: `~/Library/Preferences/Autodesk/maya/modules`
+   - Linux: `~/maya/modules`
+
+To keep it somewhere else, unzip it there and add that folder to `MAYA_MODULE_PATH` in `Maya.env` (`Documents\maya\<version>\Maya.env` on Windows). Separate several paths with `;` on Windows, and with `:` on macOS and Linux.
+
+```
+MAYA_MODULE_PATH=D:\tools\sdkk_module
+```
+
+To use a clone of this repository instead, name the folder `sdkk` and add the folder itself to `MAYA_MODULE_PATH`. The `sdkk.mod` inside it puts its parent directory on the Python path.
 
 ## Usage
 

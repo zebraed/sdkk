@@ -5,8 +5,8 @@ __author__ = "zebraed"
 __copyright__ = "Copyright 2019-2026, zebraed"
 __license__ = "MIT"
 __email__ = "contact@sarygamysh.com"
-__status__ = "Stable"
-__version__ = "2.1.0"
+__status__ = "Development"
+__version__ = "2.1.1"
 
 import importlib
 from typing import TYPE_CHECKING

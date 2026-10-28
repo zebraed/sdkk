@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.1.1] - 2026-10-29
+
+### Added
+
+- Help > Open Web Document Page, with the URL set in `config/document.json`
+- Maya module file (`sdkk.mod`)
+- Check boxes in the header of the Mirror table to switch a whole column
+
+### Changed
+
+- Mirror table: visible check boxes, a column for the row check, and alternating row colors
+- Mirror table fills the height of the tab
+
+### Fixed
+
+- The pose strip no longer keeps adding to a Control that does not move the driver, and warns instead
+- The pose strip follows a Control that moves the driver in the opposite direction or by another scale
+- Changing an invert check in the Mirror table no longer checks the row
+
 ## [2.1.0] - 2026-10-27
 
 ### Added

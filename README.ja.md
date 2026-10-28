@@ -32,6 +32,8 @@ GUIの操作は、同じ内容のPythonコマンドとしてScript Editorに出�
 
 ## インストール
 
+### scriptsディレクトリへコピーする（かんたん）
+
 1. このリポジトリを、`sdkk`という名前のフォルダとして、Mayaのscriptsディレクトリへコピーします。
 
    - Windows: `%USERPROFILE%\Documents\maya\scripts\sdkk`
@@ -46,6 +48,24 @@ GUIの操作は、同じ内容のPythonコマンドとしてScript Editorに出�
 import sys
 sys.path.insert(0, r"/path/to/parent_of_sdkk")
 ```
+
+### モジュールファイルを使う
+
+1. [Releases](https://github.com/zebraed/sdkk/releases)から`sdkk-vX.Y.Z.zip`をダウンロードします。
+2. Mayaのmodulesディレクトリへ展開し、`sdkk.mod`と`sdkk`フォルダが並ぶようにします。
+
+   - Windows: `%USERPROFILE%\Documents\maya\modules`
+   - macOS: `~/Library/Preferences/Autodesk/maya/modules`
+   - Linux: `~/maya/modules`
+
+別の場所に置く場合は、そこへ展開し、そのフォルダを`Maya.env`の`MAYA_MODULE_PATH`へ追加します(Windowsでは`Documents\maya\<version>\Maya.env`)。複数のパスは、Windowsでは`;`、macOSとLinuxでは`:`で区切ります。
+
+```
+MAYA_MODULE_PATH=D:\tools\sdkk_module
+```
+
+このリポジトリのクローンを使う場合は、フォルダ名を`sdkk`にし、そのフォルダ自体を`MAYA_MODULE_PATH`へ追加します。中の`sdkk.mod`が、その親ディレクトリをPythonのパスへ追加します。
+
 
 ## 使い方
 

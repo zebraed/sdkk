@@ -19,10 +19,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check the versions
+        run: bash .github/scripts/check_version.sh "$GITHUB_REF_NAME"
+
+      - name: Build the module ZIP
+        run: bash .github/scripts/build_zip.sh "$GITHUB_REF_NAME"
+
       - name: Create Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" "sdkk-$GITHUB_REF_NAME.zip" \
             --verify-tag \
             --generate-notes
